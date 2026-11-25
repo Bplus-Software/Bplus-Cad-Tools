@@ -1,0 +1,19 @@
+name = "bplus-map"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+[vars]
+GLOBAL_MONTH_CAP = "99000"   # hard stop for all users together, per month (Pacific)
+GLOBAL_DAY_CAP = "3200"      # hard stop per day (Pacific); keep at or below the Google daily quota
+USER_MONTH_CAP = "5000"      # per install, per month
+REGISTER_PER_IP_DAY = "5"
+
+[[durable_objects.bindings]]
+name = "METER"
+class_name = "Meter"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Meter"]
+
+# Secrets (never in this file): GOOGLE_KEY and TOKEN_SECRET, set with `wrangler secret put`.

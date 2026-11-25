@@ -19,18 +19,20 @@ namespace BPlus.LiveMap.Core
     /// <summary>Client for Google's Map Tiles API (2D tiles). Needs the user's own API key.</summary>
     public sealed class GoogleTiles
     {
-        const string Host = "https://tile.googleapis.com";
-        readonly HttpClient _http; readonly Func<string> _key; readonly TileCache _cache; readonly UsageCounter _usage;
+        const string DirectHost = "https://tile.googleapis.com";
+        readonly Func<string> _hostProv; readonly Func<CancellationToken, Task<string>> _cred; string _lastHost = "";
+        string Host { get { string h = _hostProv == null ? null : _hostProv(); return string.IsNullOrEmpty(h) ? DirectHost : h.TrimEnd('/'); } }
+        readonly HttpClient _http; readonly TileCache _cache; readonly UsageCounter _usage;
         string _session; DateTime _sessionExpiry = DateTime.MinValue; MapKind _sessionKind;
         public string Copyright { get; private set; }
         public int MaxZoom { get; private set; }
 
-        public GoogleTiles(Func<string> keyProvider, TileCache cache, UsageCounter usage, HttpMessageHandler handler = null)
+        public GoogleTiles(Func<CancellationToken, Task<string>> credential, Func<string> hostProvider, TileCache cache, UsageCounter usage, HttpMessageHandler handler = null)
         {
             try { ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12; } catch { }
             _http = handler == null ? new HttpClient() : new HttpClient(handler);
             _http.Timeout = TimeSpan.FromSeconds(20);
-            _key = keyProvider; _cache = cache; _usage = usage; MaxZoom = 21; Copyright = "";
+            _cred = credential; _hostProv = hostProvider; _cache = cache; _usage = usage; MaxZoom = 21; Copyright = "";
         }
 
         public static string SessionBody(MapKind k)
@@ -59,10 +61,12 @@ namespace BPlus.LiveMap.Core
 
         public async Task<string> EnsureSessionAsync(MapKind kind, CancellationToken ct)
         {
-            string key = _key();
+            string host = Host;
+            if (host != _lastHost) { _session = null; _lastHost = host; _cache.Clear(); }
+            string key = await _cred(ct).ConfigureAwait(false);
             if (string.IsNullOrEmpty(key)) throw new InvalidOperationException("No Google API key is saved. Run BPGMAPSET to add it.");
             if (_session != null && kind == _sessionKind && DateTime.UtcNow < _sessionExpiry.AddMinutes(-5)) return _session;
-            var req = new HttpRequestMessage(HttpMethod.Post, Host + "/v1/createSession?key=" + Uri.EscapeDataString(key))
+            var req = new HttpRequestMessage(HttpMethod.Post, host + "/v1/createSession?key=" + Uri.EscapeDataString(key))
             { Content = new StringContent(SessionBody(kind), Encoding.UTF8, "application/json") };
             var resp = await _http.SendAsync(req, ct).ConfigureAwait(false);
             string body = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
@@ -74,6 +78,9 @@ namespace BPlus.LiveMap.Core
 
         public static string Explain(int status, string body)
         {
+            // Answers from the BPlus map server carry their own plain message.
+            var pm = Regex.Match(body ?? "", @"""code""\s*:\s*""(daily_cap|monthly_cap|user_quota|revoked|bad_token|register_limit)""\s*,\s*""message""\s*:\s*""((?:[^""\\]|\\.)*)""");
+            if (pm.Success) return Regex.Unescape(pm.Groups[2].Value);
             string msg = Regex.Match(body ?? "", "\"message\"\\s*:\\s*\"([^\"]+)\"").Groups[1].Value;
             if (status == 403 || status == 400) return "Google refused the request (" + status + "). " + (msg.Length > 0 ? msg + " " : "") + "Check that the key is correct, Map Tiles API is enabled, and billing is on.";
             if (status == 429) return "Google says too many requests (429). Wait a minute and refresh.";
@@ -85,7 +92,7 @@ namespace BPlus.LiveMap.Core
             try
             {
                 string s = await EnsureSessionAsync(kind, ct).ConfigureAwait(false);
-                string url = Host + "/tile/v1/viewport?session=" + s + "&key=" + Uri.EscapeDataString(_key()) + "&zoom=" + zoom
+                string url = Host + "/tile/v1/viewport?session=" + s + "&key=" + Uri.EscapeDataString(await _cred(ct).ConfigureAwait(false)) + "&zoom=" + zoom
                     + "&north=" + north.ToString("R", CultureInfo.InvariantCulture) + "&south=" + south.ToString("R", CultureInfo.InvariantCulture)
                     + "&east=" + east.ToString("R", CultureInfo.InvariantCulture) + "&west=" + west.ToString("R", CultureInfo.InvariantCulture);
                 var resp = await _http.GetAsync(url, ct).ConfigureAwait(false);
@@ -105,7 +112,7 @@ namespace BPlus.LiveMap.Core
             byte[] cached;
             if (_cache.TryGetFresh(Key(kind, id), out cached)) return new TileResult { Data = cached, FromCache = true, StatusCode = 200 };
             string s = await EnsureSessionAsync(kind, ct).ConfigureAwait(false);
-            string url = Host + "/v1/2dtiles/" + id.Z + "/" + id.X + "/" + id.Y + "?session=" + s + "&key=" + Uri.EscapeDataString(_key());
+            string url = Host + "/v1/2dtiles/" + id.Z + "/" + id.X + "/" + id.Y + "?session=" + s + "&key=" + Uri.EscapeDataString(await _cred(ct).ConfigureAwait(false));
             var resp = await _http.GetAsync(url, ct).ConfigureAwait(false);
             _usage.Add(1);
             if (!resp.IsSuccessStatusCode)

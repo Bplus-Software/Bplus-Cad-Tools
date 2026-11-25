@@ -46,3 +46,47 @@ public class InstallTests
     }
     static void Install(Stream s, string t) { InstallLogic.Install(s, t, x => { }); }
 }
+
+public class ProxyClientTests
+{
+    sealed class Fake : System.Net.Http.HttpMessageHandler
+    {
+        public System.Collections.Generic.List<string> Urls = new System.Collections.Generic.List<string>();
+        public int TileStatus = 200;
+        protected override System.Threading.Tasks.Task<System.Net.Http.HttpResponseMessage> SendAsync(System.Net.Http.HttpRequestMessage r, System.Threading.CancellationToken ct)
+        {
+            Urls.Add(r.Method + " " + r.RequestUri);
+            var res = new System.Net.Http.HttpResponseMessage((System.Net.HttpStatusCode)(r.RequestUri.AbsolutePath.Contains("createSession") ? 200 : TileStatus));
+            if (r.RequestUri.AbsolutePath.Contains("createSession")) res.Content = new System.Net.Http.StringContent("{\"session\":\"S1\",\"expiry\":\"4102444800\"}");
+            else if (TileStatus == 200) res.Content = new System.Net.Http.ByteArrayContent(new byte[] { 1, 2, 3 });
+            else res.Content = new System.Net.Http.StringContent("{\"error\":{\"code\":\"daily_cap\",\"message\":\"Today's shared map limit has been reached.\"}}");
+            return System.Threading.Tasks.Task.FromResult(res);
+        }
+    }
+    static BPlus.LiveMap.Core.GoogleTiles Make(Fake f, string host)
+    {
+        return new BPlus.LiveMap.Core.GoogleTiles(ct => System.Threading.Tasks.Task.FromResult("TOKEN"), () => host,
+            new BPlus.LiveMap.Core.TileCache(10), new BPlus.LiveMap.Core.UsageCounter(System.IO.Path.GetTempFileName()), f);
+    }
+    [Fact] public void ProxyModeSendsTokenToProxyHostOnly()
+    {
+        var f = new Fake(); var g = Make(f, "https://map.example.workers.dev/");
+        var r = g.GetTileAsync(BPlus.LiveMap.Core.MapKind.Satellite, new BPlus.LiveMap.Core.TileId(10, 1, 2), System.Threading.CancellationToken.None).Result;
+        Assert.NotNull(r.Data);
+        Assert.All(f.Urls, u => Assert.Contains("https://map.example.workers.dev/", u));
+        Assert.All(f.Urls, u => Assert.Contains("key=TOKEN", u));
+        Assert.DoesNotContain(f.Urls, u => u.Contains("googleapis.com"));
+    }
+    [Fact] public void DirectModeUsesGoogleHost()
+    {
+        var f = new Fake(); var g = Make(f, "");
+        g.GetTileAsync(BPlus.LiveMap.Core.MapKind.Satellite, new BPlus.LiveMap.Core.TileId(10, 1, 2), System.Threading.CancellationToken.None).Wait();
+        Assert.All(f.Urls, u => Assert.Contains("https://tile.googleapis.com/", u));
+    }
+    [Fact] public void ServerLimitMessageIsShownAsIs()
+    {
+        var f = new Fake { TileStatus = 429 }; var g = Make(f, "https://x.example/");
+        var r = g.GetTileAsync(BPlus.LiveMap.Core.MapKind.Satellite, new BPlus.LiveMap.Core.TileId(10, 1, 2), System.Threading.CancellationToken.None).Result;
+        Assert.Null(r.Data); Assert.Equal("Today's shared map limit has been reached.", r.Error);
+    }
+}

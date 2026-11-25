@@ -31,7 +31,30 @@ namespace BPlus.LiveMap
     {
         public static readonly TileCache Cache = new TileCache(400);
         public static readonly UsageCounter Usage = new UsageCounter(Paths.Usage);
-        public static readonly GoogleTiles Client = new GoogleTiles(KeyStore.Get, Cache, Usage);
+        public static readonly GoogleTiles Client = new GoogleTiles(Credential, () => Config.UseOwnKey ? "" : Config.ServerUrl, Cache, Usage);
+        static readonly System.Net.Http.HttpClient Reg = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(20) };
+        static readonly SemaphoreSlim RegLock = new SemaphoreSlim(1, 1);
+
+        // Shared mode: the install token from the BPlus map server stands in for the Google key. Own mode: the user's own key.
+        static async Task<string> Credential(CancellationToken ct)
+        {
+            if (Config.UseOwnKey) return KeyStore.Get();
+            string t = Config.InstallToken; if (t.Length > 0) return t;
+            await RegLock.WaitAsync(ct).ConfigureAwait(false);
+            try
+            {
+                t = Config.InstallToken; if (t.Length > 0) return t;
+                string url = Config.ServerUrl; if (string.IsNullOrEmpty(url) || url.Contains("@@")) throw new InvalidOperationException("This build has no map server address. Use your own Google key in BPGMAPSET.");
+                var resp = await Reg.PostAsync(url.TrimEnd('/') + "/v1/register", new System.Net.Http.StringContent("{}", System.Text.Encoding.UTF8, "application/json"), ct).ConfigureAwait(false);
+                string body = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+                if (!resp.IsSuccessStatusCode) throw new InvalidOperationException(GoogleTiles.Explain((int)resp.StatusCode, body));
+                var m = System.Text.RegularExpressions.Regex.Match(body, "\"token\"\\s*:\\s*\"([0-9a-f.]+)\"");
+                if (!m.Success) throw new InvalidOperationException("The map server gave an unexpected answer.");
+                Config.InstallToken = m.Groups[1].Value; Log.Write("Registered this install with the map server.");
+                return Config.InstallToken;
+            }
+            finally { RegLock.Release(); }
+        }
         static SynchronizationContext _ui;
         static MapDrawable _drawable; static bool _transientAdded;
         static readonly Dictionary<Database, CsProvider> Providers = new Dictionary<Database, CsProvider>();
@@ -185,7 +208,7 @@ namespace BPlus.LiveMap
         {
             Plan plan;
             try { plan = MakePlan(prov, vi); } catch (Exception e) { Say("Could not work out the map area: " + e.Message, true); return; }
-            if (string.IsNullOrEmpty(KeyStore.Get())) { Say("No Google API key is saved yet. Run BPGMAPSET and paste your key.", true); On = false; Config.Enabled = false; RemoveTransient(); return; }
+            if (Config.UseOwnKey && string.IsNullOrEmpty(KeyStore.Get())) { Say("No Google API key is saved yet. Run BPGMAPSET and paste your key.", true); On = false; Config.Enabled = false; RemoveTransient(); return; }
             if (_current != null && _current.Cts != null) _current.Cts.Cancel();
             plan.Cts = new CancellationTokenSource(); _current = plan; _busy = true;
             if (!_warned && Usage.ThisMonth >= Config.WarnAt) { _warned = true; Say("Google tile requests this month: " + Usage.ThisMonth + " (your warning level is " + Config.WarnAt + ").", true); }

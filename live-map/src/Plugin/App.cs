@@ -14,7 +14,7 @@ namespace BPlus.LiveMap
 {
     public class App : IExtensionApplication
     {
-        public static string Version = "0.1.0-experimental";
+        public static string Version = "0.2.0-experimental";
         public void Initialize()
         {
             try
@@ -48,7 +48,7 @@ namespace BPlus.LiveMap
             Guard("BPGMAP", () =>
             {
                 var doc = Doc; if (doc == null) return;
-                if (!Config.TermsAccepted || !KeyStore.HasKey) { doc.Editor.WriteMessage("\n[BPlus map] First enter your Google key and accept the terms.\n"); SettingsDialog.Show(); if (!Config.TermsAccepted || !KeyStore.HasKey) return; }
+                if (!Config.TermsAccepted || (Config.UseOwnKey && !KeyStore.HasKey)) { doc.Editor.WriteMessage("\n[BPlus map] Please read and accept the terms" + (Config.UseOwnKey ? " and enter your Google key" : "") + ".\n"); SettingsDialog.Show(); if (!Config.TermsAccepted || (Config.UseOwnKey && !KeyStore.HasKey)) return; }
                 var p = Engine.EnsureProvider(doc, true);
                 if (p == null) { doc.Editor.WriteMessage("\n[BPlus map] No coordinate system chosen. Live map not started.\n"); return; }
                 doc.Editor.WriteMessage("\n[BPlus map] Live map on. Coordinate system: " + p.Description + " (from " + p.Source + ").\nGoogle imagery is for viewing only. Do not trace or digitize from it.\n");
@@ -125,7 +125,7 @@ namespace BPlus.LiveMap
                 ed.WriteMessage("\nRuntime        : " + System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription);
                 ed.WriteMessage("\nPlugin DLL     : " + Assembly.GetExecutingAssembly().Location);
                 ed.WriteMessage("\nLog file       : " + Paths.LogFile);
-                ed.WriteMessage("\nGoogle key     : " + (KeyStore.HasKey ? "saved on this PC" : "not saved"));
+                ed.WriteMessage("\nMap source     : " + (Config.UseOwnKey ? "your own Google key (" + (KeyStore.HasKey ? "saved" : "NOT saved") + ")" : "BPlus map server " + Config.ServerUrl + " (" + (Config.InstallToken.Length > 0 ? "registered" : "not registered yet") + ")"));
                 ed.WriteMessage("\nTerms accepted : " + (Config.TermsAccepted ? "yes" : "no"));
                 ed.WriteMessage("\nCoord system   : " + (p != null ? p.Description + " (from " + p.Source + ")" : "none yet"));
                 ed.WriteMessage("\nPlan view      : " + (prob == null ? "yes" : "no - " + prob));

@@ -31,7 +31,7 @@ namespace BPlus.LiveMap.Setup
                 if (!silent)
                 {
                     bool exists = Directory.Exists(target);
-                    var r = MessageBox.Show((exists ? "BPlus Live Map is already installed. Update it?" : "Install BPlus Live Map (experimental) for AutoCAD and Civil 3D 2021 to 2026?") + "\n\nIt installs for your Windows user only. Close AutoCAD first.\nGoogle imagery is for viewing only. Do not trace or digitize from it.", "BPlus Live Map setup", MessageBoxButtons.OKCancel, MessageBoxIcon.Question);
+                    var r = MessageBox.Show((exists ? "BPlus Live Map is already installed. Update it?" : "Install BPlus Live Map (experimental) for AutoCAD and Civil 3D 2021 to 2026?") + "\n\nIt installs for your Windows user only. Close AutoCAD first.\nThe map includes Google Maps content. Its use is subject to the Google Maps/Google Earth Additional Terms (maps.google.com/help/terms_maps) and the Google Privacy Policy (policies.google.com/privacy). Imagery is for viewing only: do not trace or digitize from it. Do not distribute this plugin in China, Crimea, Cuba, Donetsk, Iran, Luhansk, North Korea, Syria or Vietnam.", "BPlus Live Map setup", MessageBoxButtons.OKCancel, MessageBoxIcon.Question);
                     if (r != DialogResult.OK) return 1;
                 }
                 Log("Install started. Installer " + Assembly.GetExecutingAssembly().GetName().Version + ", OS " + Environment.OSVersion);
@@ -44,7 +44,7 @@ namespace BPlus.LiveMap.Setup
                 {
                     string exe = Assembly.GetExecutingAssembly().Location;
                     k.SetValue("DisplayName", "BPlus Live Map (experimental)");
-                    k.SetValue("DisplayVersion", "0.1.0");
+                    k.SetValue("DisplayVersion", "0.2.0");
                     k.SetValue("Publisher", "BPlus Software");
                     k.SetValue("InstallLocation", target);
                     k.SetValue("UninstallString", "\"" + exe + "\" /U");

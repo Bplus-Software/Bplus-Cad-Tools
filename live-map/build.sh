@@ -4,6 +4,7 @@ set -e
 export PATH=$HOME/.dotnet:$PATH DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1
 cd "$(dirname "$0")"
 dotnet test src/Core.Tests -c Release 2>&1 | tail -3
+sed -i "s#@@SERVER_URL@@#${PROXY_URL:-@@SERVER_URL@@}#" src/Plugin/Defaults.cs
 dotnet build src/Plugin -c Release 2>&1 | grep -E "error|Build succeeded"
 rm -rf out && mkdir -p out/BPlusLiveMap.bundle/Contents/net48 out/BPlusLiveMap.bundle/Contents/net8
 cp bundle/PackageContents.xml out/BPlusLiveMap.bundle/
@@ -19,4 +20,5 @@ for r,d,f in os.walk('.'):
 z.close()")
 dotnet build src/Installer -c Release -p:BundleZip="$PWD/out/bundle.zip" 2>&1 | grep -E "error|Build succeeded"
 cp src/Installer/bin/Release/net48/BPlusLiveMap-Setup.exe out/
+git checkout -- src/Plugin/Defaults.cs 2>/dev/null || sed -i "s#${PROXY_URL:-@@SERVER_URL@@}#@@SERVER_URL@@#" src/Plugin/Defaults.cs
 (cd out && sha256sum BPlusLiveMap-Setup.exe > SHA256SUMS.txt && cat SHA256SUMS.txt)

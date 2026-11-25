@@ -58,10 +58,12 @@ namespace BPlus.LiveMap
     {
         public static void Show()
         {
-            using (var f = Theme.Base("BPlus Live Map - settings", 460, 470))
+            using (var f = Theme.Base("BPlus Live Map - settings", 460, 560))
             {
                 int y = 14;
-                f.Controls.Add(Theme.Lbl("Google Maps Platform API key", 16, y)); y += 22;
+                var shared = new RadioButton { Left = 16, Top = y, Width = 428, Text = "Use the BPlus map server (no key needed, shared monthly limit)", Checked = !Config.UseOwnKey, ForeColor = Theme.Text, BackColor = Color.Transparent }; f.Controls.Add(shared); y += 24;
+                var own = new RadioButton { Left = 16, Top = y, Width = 428, Text = "Use my own Google Maps Platform key (my own Google account and cost)", Checked = Config.UseOwnKey, ForeColor = Theme.Text, BackColor = Color.Transparent }; f.Controls.Add(own); y += 30;
+                f.Controls.Add(Theme.Lbl("Your Google key (only for 'my own key')", 16, y)); y += 22;
                 var key = new TextBox { Left = 16, Top = y, Width = 428, BorderStyle = BorderStyle.FixedSingle, UseSystemPasswordChar = true };
                 Theme.Style(key); if (KeyStore.HasKey) key.Text = "";
                 f.Controls.Add(key); y += 26;
@@ -77,15 +79,15 @@ namespace BPlus.LiveMap
                 f.Controls.Add(Theme.Lbl("Warn me at (requests)", 16, y, 120));
                 var warn = new NumericUpDown { Left = 130, Top = y - 3, Width = 100, Minimum = 100, Maximum = 10000000, Increment = 5000, Value = Math.Min(10000000, Math.Max(100, Config.WarnAt)), BorderStyle = BorderStyle.FixedSingle };
                 Theme.Style(warn); f.Controls.Add(warn); y += 34;
-                f.Controls.Add(Theme.Lbl("Requests this month: " + Engine.Usage.ThisMonth + "  (Google gives 100,000 free per month)", 16, y, 428, true)); y += 30;
+                f.Controls.Add(Theme.Lbl("Map requests from this PC this month: " + Engine.Usage.ThisMonth, 16, y, 428, true)); y += 30;
                 var flip = new CheckBox { Left = 16, Top = y, Width = 428, Text = "Flip image rows (turn on/off if the map looks upside down)", Checked = Config.FlipRows, ForeColor = Theme.Text, BackColor = Color.Transparent }; f.Controls.Add(flip); y += 32;
-                var terms = new CheckBox { Left = 16, Top = y, Width = 428, Height = 40, Text = "I use my own Google key and follow Google's Map Tiles terms. I will not trace or digitize from the imagery.", ForeColor = Theme.Text, BackColor = Color.Transparent, Checked = Config.TermsAccepted }; f.Controls.Add(terms); y += 46;
+                var terms = new CheckBox { Left = 16, Top = y, Width = 428, Height = 62, Text = "I agree: the map includes Google Maps content, and my use is subject to the Google Maps/Google Earth Additional Terms (maps.google.com/help/terms_maps) and the Google Privacy Policy (policies.google.com/privacy). I will not trace or digitize from the imagery.", ForeColor = Theme.Text, BackColor = Color.Transparent, Checked = Config.TermsAccepted }; f.Controls.Add(terms); y += 68;
                 var status = Theme.Lbl("", 16, y, 428, true); status.Height = 36; f.Controls.Add(status);
-                var test = Theme.Btn("Test connection", 16, 426, 120);
-                var ok = Theme.Btn("Save", 264, 426, 85, true); var cancel = Theme.Btn("Cancel", 359, 426, 85);
+                var test = Theme.Btn("Test connection", 16, 516, 120);
+                var ok = Theme.Btn("Save", 264, 516, 85, true); var cancel = Theme.Btn("Cancel", 359, 516, 85);
                 test.Click += async (s, e) =>
                 {
-                    if (key.Text.Trim().Length > 0) KeyStore.Set(key.Text.Trim());
+                    Config.UseOwnKey = own.Checked; if (key.Text.Trim().Length > 0) KeyStore.Set(key.Text.Trim());
                     status.ForeColor = Theme.Dim; status.Text = "Testing...";
                     try
                     {
@@ -97,6 +99,7 @@ namespace BPlus.LiveMap
                 };
                 ok.Click += (s, e) =>
                 {
+                    Config.UseOwnKey = own.Checked;
                     if (key.Text.Trim().Length > 0) KeyStore.Set(key.Text.Trim());
                     Config.Kind = kind.SelectedIndex == 0 ? MapKind.Satellite : kind.SelectedIndex == 1 ? MapKind.Roadmap : MapKind.Hybrid;
                     Config.OpacityPercent = (int)op.Value; Config.WarnAt = (int)warn.Value; Config.FlipRows = flip.Checked; Config.TermsAccepted = terms.Checked;
