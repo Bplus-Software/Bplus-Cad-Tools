@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.Windows.Forms;
+using System.Runtime.InteropServices;
 using BPlus.LiveMap.Core;
 
 namespace BPlus.LiveMap
@@ -8,15 +9,37 @@ namespace BPlus.LiveMap
     static class Theme
     {
         public static readonly Color Bar = Color.FromArgb(34, 41, 51), Panel = Color.FromArgb(61, 70, 84), Field = Color.FromArgb(33, 40, 48), Text = Color.FromArgb(235, 238, 242), Dim = Color.FromArgb(160, 170, 185), Accent = Color.FromArgb(0, 120, 215);
+        [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int val, int size);
+        public static void DarkTitle(Form f)
+        {
+            f.HandleCreated += (s, e) => { try { int on = 1; if (DwmSetWindowAttribute(f.Handle, 20, ref on, 4) != 0) DwmSetWindowAttribute(f.Handle, 19, ref on, 4); } catch { } };
+        }
+        public static void DarkList(ListView lv)
+        {
+            lv.OwnerDraw = true;
+            lv.DrawColumnHeader += (s, e) =>
+            {
+                using (var b = new SolidBrush(Panel)) e.Graphics.FillRectangle(b, e.Bounds);
+                TextRenderer.DrawText(e.Graphics, e.Header.Text, lv.Font, new Rectangle(e.Bounds.X + 6, e.Bounds.Y, e.Bounds.Width - 8, e.Bounds.Height), Text, TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+            };
+            lv.DrawItem += (s, e) => { if ((lv.View != View.Details)) e.DrawDefault = true; };
+            lv.DrawSubItem += (s, e) =>
+            {
+                bool sel = e.Item.Selected; var back = sel ? Accent : Field;
+                using (var b = new SolidBrush(back)) e.Graphics.FillRectangle(b, e.Bounds);
+                TextRenderer.DrawText(e.Graphics, e.SubItem.Text, lv.Font, new Rectangle(e.Bounds.X + 6, e.Bounds.Y, e.Bounds.Width - 8, e.Bounds.Height), Text, TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+            };
+        }
         public static Form Base(string title, int w, int h)
         {
             var f = new Form { Text = title, BackColor = Bar, ForeColor = Text, Font = new Font("Segoe UI", 9f), FormBorderStyle = FormBorderStyle.FixedDialog, MaximizeBox = false, MinimizeBox = false, StartPosition = FormStartPosition.CenterScreen, ClientSize = new Size(w, h), ShowInTaskbar = false };
+            DarkTitle(f);
             return f;
         }
         public static Label Lbl(string t, int x, int y, int w = 360, bool dim = false) { return new Label { Text = t, Left = x, Top = y, Width = w, AutoSize = false, Height = 20, ForeColor = dim ? Dim : Text, BackColor = Color.Transparent }; }
         public static Button Btn(string t, int x, int y, int w, bool primary = false)
         {
-            var b = new Button { Text = t, Left = x, Top = y, Width = w, Height = 28, FlatStyle = FlatStyle.Flat, ForeColor = Text, BackColor = primary ? Accent : Panel, UseVisualStyleBackColor = false };
+            var b = new Button { Text = t, Left = x, Top = y, Width = w, Height = 28, FlatStyle = FlatStyle.Flat, ForeColor = Text, BackColor = primary ? Accent : Color.FromArgb(86, 98, 116), UseVisualStyleBackColor = false };
             b.FlatAppearance.BorderSize = 0; return b;
         }
         public static void Style(Control c) { c.BackColor = Field; c.ForeColor = Text; }
@@ -61,7 +84,7 @@ namespace BPlus.LiveMap
             using (var f = Theme.Base("BPlus Live Map - settings", 460, 560))
             {
                 int y = 14;
-                var shared = new RadioButton { Left = 16, Top = y, Width = 428, Text = "Use the BPlus map server (no key needed, shared monthly limit)", Checked = !Config.UseOwnKey, ForeColor = Theme.Text, BackColor = Color.Transparent }; f.Controls.Add(shared); y += 24;
+                var shared = new RadioButton { Left = 16, Top = y, Width = 428, Text = Config.SharedAvailable ? "Use the BPlus map server (no key needed, shared monthly limit)" : "BPlus map server: not available yet (use your own key)", Enabled = Config.SharedAvailable, Checked = !Config.UseOwnKey, ForeColor = Theme.Text, BackColor = Color.Transparent }; f.Controls.Add(shared); y += 24;
                 var own = new RadioButton { Left = 16, Top = y, Width = 428, Text = "Use my own Google Maps Platform key (my own Google account and cost)", Checked = Config.UseOwnKey, ForeColor = Theme.Text, BackColor = Color.Transparent }; f.Controls.Add(own); y += 30;
                 f.Controls.Add(Theme.Lbl("Your Google key (only for 'my own key')", 16, y)); y += 22;
                 var key = new TextBox { Left = 16, Top = y, Width = 428, BorderStyle = BorderStyle.FixedSingle, UseSystemPasswordChar = true };

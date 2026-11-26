@@ -208,7 +208,7 @@ namespace BPlus.LiveMap
         {
             Plan plan;
             try { plan = MakePlan(prov, vi); } catch (Exception e) { Say("Could not work out the map area: " + e.Message, true); return; }
-            if (Config.UseOwnKey && string.IsNullOrEmpty(KeyStore.Get())) { Say("No Google API key is saved yet. Run BPGMAPSET and paste your key.", true); On = false; Config.Enabled = false; RemoveTransient(); return; }
+            if (Config.UseOwnKey && string.IsNullOrEmpty(KeyStore.Get())) { Say("No Google API key is saved yet. Run BPGMAPSET and paste your key.", true); try { System.Windows.Forms.MessageBox.Show("No Google key is saved, so the live map was turned off. Open Live map > Options > Settings and Google key and paste your key.", "B+ CAD Tools - Live Map"); } catch { } On = false; Config.Enabled = false; RemoveTransient(); return; }
             if (_current != null && _current.Cts != null) _current.Cts.Cancel();
             plan.Cts = new CancellationTokenSource(); _current = plan; _busy = true;
             if (!_warned && Usage.ThisMonth >= Config.WarnAt) { _warned = true; Say("Google tile requests this month: " + Usage.ThisMonth + " (your warning level is " + Config.WarnAt + ").", true); }

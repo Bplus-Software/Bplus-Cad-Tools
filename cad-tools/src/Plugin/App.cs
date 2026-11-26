@@ -14,7 +14,7 @@ namespace BPlus.LiveMap
 {
     public class App : IExtensionApplication
     {
-        public static string Version = "0.3.1-experimental";
+        public static string Version = "0.3.2-experimental";
         public void Initialize()
         {
             try
@@ -22,6 +22,7 @@ namespace BPlus.LiveMap
                 Log.Write("Startup. Plugin " + Version + ", runtime " + System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription + ", AutoCAD " + AcApp.Version + ", DLL " + Assembly.GetExecutingAssembly().Location);
                 Engine.Init();
                 Ribbon.Install();
+                UpdateCheck.StartupCheck();
                 var ed = AcApp.DocumentManager.MdiActiveDocument?.Editor;
                 if (ed != null) ed.WriteMessage("\nB+ CAD Tools " + Version + " loaded. Use the B+ CAD Tools tab.\n");
             }
@@ -48,11 +49,12 @@ namespace BPlus.LiveMap
             Guard("BPGMAP", () =>
             {
                 var doc = Doc; if (doc == null) return;
-                if (!Config.TermsAccepted || (Config.UseOwnKey && !KeyStore.HasKey)) { doc.Editor.WriteMessage("\n[BPlus map] Please read and accept the terms" + (Config.UseOwnKey ? " and enter your Google key" : "") + ".\n"); SettingsDialog.Show(); if (!Config.TermsAccepted || (Config.UseOwnKey && !KeyStore.HasKey)) return; }
+                if (!Config.TermsAccepted || (Config.UseOwnKey && !KeyStore.HasKey)) { doc.Editor.WriteMessage("\n[BPlus map] Please read and accept the terms" + (Config.UseOwnKey ? " and enter your Google key" : "") + ".\n"); SettingsDialog.Show(); if (!Config.TermsAccepted || (Config.UseOwnKey && !KeyStore.HasKey)) { System.Windows.Forms.MessageBox.Show("The live map did not start: " + (!Config.TermsAccepted ? "the terms were not accepted. " : "") + (Config.UseOwnKey && !KeyStore.HasKey ? "No Google key is saved. Click Live map > Options > Settings and Google key, paste your key, tick the terms and press Save." : ""), "B+ CAD Tools - Live Map", System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Information); return; } }
                 var p = Engine.EnsureProvider(doc, true);
                 if (p == null) { doc.Editor.WriteMessage("\n[BPlus map] No coordinate system chosen. Live map not started.\n"); return; }
                 doc.Editor.WriteMessage("\n[BPlus map] Live map on. Coordinate system: " + p.Description + " (from " + p.Source + ").\nGoogle imagery is for viewing only. Do not trace or digitize from it.\n");
                 Engine.SetOn(true);
+                System.Windows.Forms.MessageBox.Show("Live map is on.\n\nIt shows Google imagery behind the whole drawing view, in the drawing's coordinate system (" + p.Description + "). Use PLAN > World first, then pan and zoom. Click Live map again to turn it off.\n\nIf you see nothing: run BPGMAPTEST, or BPCHECK and send the result.", "B+ CAD Tools - Live Map", System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Information);
             });
         }
         public static void Off() { Guard("BPGMAP", () => { Engine.SetOn(false); Doc?.Editor.WriteMessage("\n[BPlus map] Live map off.\n"); }); }

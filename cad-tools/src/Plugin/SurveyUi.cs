@@ -28,9 +28,9 @@ namespace BPlus.LiveMap
                 var c = new ImportChoice();
                 f.Controls.Add(Theme.Lbl("Points file (txt, csv or xlsx):", 16, 14, 300));
                 var path = Box(16, 38, 392); var br = Theme.Btn("Browse...", 416, 36, 88);
-                f.Controls.Add(Theme.Lbl("Column order:", 16, 76, 150)); var ord = Combo(16, 98, 250, OrderNames); var custom = Box(276, 98, 100); custom.Visible = false; custom.MaxLength = 5;
+                f.Controls.Add(Theme.Lbl("Column order:", 16, 76, 150)); var ord = Combo(16, 98, 250, OrderNames); { int oi = Array.IndexOf(OrderCodes, Config.PointOrder); if (oi >= 0) ord.SelectedIndex = oi; } var custom = Box(276, 98, 100); custom.Visible = false; custom.MaxLength = 5;
                 f.Controls.Add(Theme.Lbl("Separator:", 392, 76, 110)); var del = Combo(392, 98, 112, DelimNames);
-                var lab = Chk("Add text labels (number and code)", 16, 132, 280, true); var th = Box(430, 130, 74); th.Text = "1"; var thl = Theme.Lbl("Text height:", 340, 133, 86, true);
+                var lab = Chk("Add text labels (number and code)", 16, 132, 280, true); var th = Box(430, 130, 74); th.Text = Config.TextHeight.ToString(System.Globalization.CultureInfo.InvariantCulture); var thl = Theme.Lbl("Text height:", 340, 133, 86, true);
                 var pre = new ListView { Left = 16, Top = 168, Width = 488, Height = 210, View = View.Details, FullRowSelect = true, BorderStyle = BorderStyle.None, HeaderStyle = ColumnHeaderStyle.Nonclickable }; Theme.Style(pre);
                 foreach (var h in new[] { "Point", "Easting", "Northing", "Elevation", "Description" }) pre.Columns.Add(h, h == "Description" ? 140 : 84);
                 var info = Theme.Lbl("Choose a file to see a preview.", 16, 384, 488, true); info.Height = 36;
@@ -76,7 +76,7 @@ namespace BPlus.LiveMap
                 var c = new ExportChoice();
                 f.Controls.Add(Theme.Lbl("Format:", 16, 14, 100)); var ord = Combo(16, 36, 250, OrderNames.Take(5).ToArray());
                 f.Controls.Add(Theme.Lbl("Separator:", 280, 14, 100)); var del = Combo(280, 36, 180, "Comma (csv)", "Tab", "Space", "Semicolon");
-                f.Controls.Add(Theme.Lbl("Decimals:", 16, 72, 80)); var dec = new NumericUpDown { Left = 100, Top = 70, Width = 60, Minimum = 0, Maximum = 8, Value = 3 }; Theme.Style(dec);
+                f.Controls.Add(Theme.Lbl("Decimals:", 16, 72, 80)); var dec = new NumericUpDown { Left = 100, Top = 70, Width = 60, Minimum = 0, Maximum = 8, Value = Config.Decimals }; Theme.Style(dec);
                 var hdr = Chk("Header row", 200, 70, 200, false);
                 f.Controls.Add(Theme.Lbl("Categories to export:", 16, 108, 300));
                 var list = new CheckedListBox { Left = 16, Top = 132, Width = 444, Height = 170, BorderStyle = BorderStyle.None, CheckOnClick = true }; Theme.Style(list);
@@ -168,33 +168,49 @@ namespace BPlus.LiveMap
             }
         }
 
-        // Returns the index to zoom to (and the dialog should reopen), -1 to close.
-        public static int Qa(List<QaIssue> issues, int pointCount, int selected)
+        public sealed class QaRow { public int Issue; public SurveyPoint P; public bool First; public string Kind = "", Details = ""; }
+        public static string PointId(SurveyPoint p) { return !string.IsNullOrEmpty(p.No) ? p.No : (!string.IsNullOrEmpty(p.Ref) ? "#" + p.Ref + " (no number)" : "(no number)"); }
+        public static List<QaRow> QaRows(List<QaIssue> issues)
         {
-            using (var f = Theme.Base("BPlus - Survey QA/QC", 640, 480))
+            var rows = new List<QaRow>();
+            for (int i = 0; i < issues.Count; i++)
             {
-                f.Controls.Add(Theme.Lbl(pointCount + " points checked, " + issues.Count + " findings.", 16, 12, 600));
-                var lv = new ListView { Left = 16, Top = 38, Width = 608, Height = 340, View = View.Details, FullRowSelect = true, BorderStyle = BorderStyle.None, MultiSelect = false }; Theme.Style(lv);
-                lv.Columns.Add("Check", 150); lv.Columns.Add("Point", 110); lv.Columns.Add("Details", 330);
-                foreach (var q in issues) lv.Items.Add(new ListViewItem(new[] { q.Kind, q.PointNo, q.Text }));
+                var q = issues[i]; var pts = q.Points.Count > 0 ? q.Points : new List<SurveyPoint> { new SurveyPoint { No = q.PointNo, E = q.E, N = q.N, HasZ = false } };
+                for (int k = 0; k < pts.Count; k++) rows.Add(new QaRow { Issue = i, P = pts[k], First = k == 0, Kind = q.Kind, Details = k == 0 ? q.Text : "" });
+            }
+            return rows;
+        }
+        static string N3(double v) { return v.ToString("F3", System.Globalization.CultureInfo.InvariantCulture); }
+
+        // action: 0 close, 1 zoom to the selected point, 2 select the points of the selected finding in the drawing. row = selected row index.
+        public static void Qa(List<QaIssue> issues, int pointCount, int selected, out int action, out int row, out List<QaRow> rowsOut)
+        {
+            var rows = QaRows(issues); rowsOut = rows; int act = 0, sel = -1;
+            using (var f = Theme.Base("B+ CAD Tools - Survey QA/QC", 820, 500))
+            {
+                f.Controls.Add(Theme.Lbl(pointCount + " points checked, " + issues.Count + (issues.Count == 1 ? " finding" : " findings") + " (" + rows.Count + " points).", 16, 12, 780));
+                var lv = new ListView { Left = 16, Top = 38, Width = 788, Height = 360, View = View.Details, FullRowSelect = true, BorderStyle = BorderStyle.None, MultiSelect = false, HideSelection = false }; Theme.Style(lv); Theme.DarkList(lv);
+                lv.Columns.Add("Check", 130); lv.Columns.Add("Point", 130); lv.Columns.Add("Easting", 100); lv.Columns.Add("Northing", 110); lv.Columns.Add("Elev.", 70); lv.Columns.Add("Code", 70); lv.Columns.Add("Details", 170);
+                foreach (var r in rows) lv.Items.Add(new ListViewItem(new[] { r.First ? r.Kind : "", PointId(r.P), N3(r.P.E), N3(r.P.N), r.P.HasZ ? N3(r.P.Z) : "", PointText.Clean(r.P.Desc), r.Details }));
                 if (selected >= 0 && selected < lv.Items.Count) { lv.Items[selected].Selected = true; lv.EnsureVisible(selected); }
-                f.Controls.Add(Theme.Lbl("Zoom centres the view on the finding (plan view, WCS).", 16, 386, 608, true));
-                var zoom = Theme.Btn("Zoom to", 16, 430, 90, true); var copy = Theme.Btn("Copy", 114, 430, 80); var save = Theme.Btn("Save CSV...", 202, 430, 100); var close = Theme.Btn("Close", 534, 430, 90);
-                int result = -1;
-                zoom.Click += (s, e) => { if (lv.SelectedIndices.Count == 0) return; result = lv.SelectedIndices[0]; f.DialogResult = DialogResult.Retry; };
-                copy.Click += (s, e) => { try { Clipboard.SetText(Csv(issues)); } catch { } };
-                save.Click += (s, e) => { using (var d = new SaveFileDialog { Filter = "CSV|*.csv", FileName = "qa-report.csv" }) if (d.ShowDialog(f) == DialogResult.OK) File.WriteAllText(d.FileName, Csv(issues), new UTF8Encoding(true)); };
+                f.Controls.Add(Theme.Lbl("Zoom to centres on the point and marks it with a red circle. Select in drawing selects the points of that finding.", 16, 406, 788, true));
+                var zoom = Theme.Btn("Zoom to", 16, 456, 100, true); var pick = Theme.Btn("Select in drawing", 124, 456, 150); var copy = Theme.Btn("Copy", 282, 456, 80); var save = Theme.Btn("Save CSV...", 370, 456, 100); var close = Theme.Btn("Close", 714, 456, 90);
+                zoom.Click += (s, e) => { if (lv.SelectedIndices.Count == 0) return; sel = lv.SelectedIndices[0]; act = 1; f.DialogResult = DialogResult.OK; };
+                pick.Click += (s, e) => { if (lv.SelectedIndices.Count == 0) return; sel = lv.SelectedIndices[0]; act = 2; f.DialogResult = DialogResult.OK; };
+                copy.Click += (s, e) => { try { Clipboard.SetText(Csv(rows)); } catch { } };
+                save.Click += (s, e) => { using (var d = new SaveFileDialog { Filter = "CSV|*.csv", FileName = "qa-report.csv" }) if (d.ShowDialog(f) == DialogResult.OK) File.WriteAllText(d.FileName, Csv(rows), new UTF8Encoding(true)); };
                 close.Click += (s, e) => f.DialogResult = DialogResult.Cancel;
                 lv.DoubleClick += (s, e) => zoom.PerformClick();
-                f.Controls.AddRange(new Control[] { lv, zoom, copy, save, close }); f.CancelButton = close;
-                f.ShowDialog(); return result;
+                f.Controls.AddRange(new Control[] { lv, zoom, pick, copy, save, close }); f.CancelButton = close;
+                f.ShowDialog();
             }
+            action = act; row = sel;
         }
-        static string Csv(List<QaIssue> issues)
+        static string Csv(List<QaRow> rows)
         {
             Func<string, string> q = s => "\"" + (s ?? "").Replace("\"", "\"\"") + "\"";
-            var sb = new StringBuilder("Check,Point,Easting,Northing,Details\r\n");
-            foreach (var i in issues) sb.Append(q(i.Kind)).Append(',').Append(q(i.PointNo)).Append(',').Append(i.E.ToString("F3", System.Globalization.CultureInfo.InvariantCulture)).Append(',').Append(i.N.ToString("F3", System.Globalization.CultureInfo.InvariantCulture)).Append(',').Append(q(i.Text)).Append("\r\n");
+            var sb = new StringBuilder("Check,Point,Easting,Northing,Elevation,Code,Details\r\n");
+            foreach (var r in rows) sb.Append(q(r.Kind)).Append(',').Append(q(PointId(r.P))).Append(',').Append(N3(r.P.E)).Append(',').Append(N3(r.P.N)).Append(',').Append(r.P.HasZ ? N3(r.P.Z) : "").Append(',').Append(q(PointText.Clean(r.P.Desc))).Append(',').Append(q(r.Details)).Append("\r\n");
             return sb.ToString();
         }
     }

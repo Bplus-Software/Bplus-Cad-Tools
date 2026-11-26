@@ -11,7 +11,7 @@ namespace BPlus.LiveMap.Core
 {
     public sealed class SurveyPoint
     {
-        public string No = ""; public double E, N, Z; public bool HasZ = true; public string Desc = ""; public string Category = "";
+        public string No = ""; public double E, N, Z; public bool HasZ = true; public string Desc = ""; public string Category = ""; public string Ref = "";
     }
 
     public sealed class ParseResult
@@ -300,7 +300,7 @@ namespace BPlus.LiveMap.Core
         public void Apply(IEnumerable<SurveyPoint> pts) { foreach (var p in pts) p.Category = Classify(p.Desc); }
     }
 
-    public sealed class QaIssue { public string Kind = "", PointNo = "", Text = ""; public double E, N; }
+    public sealed class QaIssue { public string Kind = "", PointNo = "", Text = ""; public double E, N; public List<SurveyPoint> Points = new List<SurveyPoint>(); }
     public sealed class QaOptions { public double CoincidentTol = 0.005, SpikeThreshold = 1.0, FarDist = 200; }
 
     public static class SurveyQa
@@ -308,10 +308,10 @@ namespace BPlus.LiveMap.Core
         public static List<QaIssue> Run(IList<SurveyPoint> pts, QaOptions o)
         {
             var res = new List<QaIssue>();
-            string Id(SurveyPoint p, int i) { return string.IsNullOrEmpty(p.No) ? "#" + (i + 1) : p.No; }
+            string Id(SurveyPoint p, int i) { return string.IsNullOrEmpty(p.No) ? (string.IsNullOrEmpty(p.Ref) ? "#" + (i + 1) : "#" + p.Ref) : p.No; }
             // 1 repeated point numbers
             foreach (var g in pts.Select((p, i) => new { p, i }).Where(x => !string.IsNullOrEmpty(x.p.No)).GroupBy(x => x.p.No).Where(g => g.Count() > 1))
-                res.Add(new QaIssue { Kind = "Repeated number", PointNo = g.Key, Text = "Point number used " + g.Count() + " times.", E = g.First().p.E, N = g.First().p.N });
+                res.Add(new QaIssue { Kind = "Repeated number", PointNo = g.Key, Text = "Point number used " + g.Count() + " times.", E = g.First().p.E, N = g.First().p.N, Points = g.Select(x => x.p).ToList() });
             // 2 coincident points
             var order = Enumerable.Range(0, pts.Count).OrderBy(i => pts[i].E).ToList();
             for (int a = 0; a < order.Count; a++)
@@ -320,14 +320,14 @@ namespace BPlus.LiveMap.Core
                     var p = pts[order[a]]; var q = pts[order[b]];
                     double dx = p.E - q.E, dy = p.N - q.N; if (Math.Sqrt(dx * dx + dy * dy) > o.CoincidentTol) continue;
                     double dz = p.Z - q.Z;
-                    res.Add(new QaIssue { Kind = Math.Abs(dz) < 0.001 ? "Duplicate point" : "Same XY, different Z", PointNo = Id(p, order[a]) + " / " + Id(q, order[b]), Text = Math.Abs(dz) < 0.001 ? "Two points at the same place." : "Same place, elevation differs by " + Math.Abs(dz).ToString("F3", CultureInfo.InvariantCulture) + ".", E = p.E, N = p.N });
+                    res.Add(new QaIssue { Kind = Math.Abs(dz) < 0.001 ? "Duplicate point" : "Same XY, different Z", PointNo = Id(p, order[a]) + " / " + Id(q, order[b]), Text = Math.Abs(dz) < 0.001 ? "Two points at the same place." : "Same place, elevation differs by " + Math.Abs(dz).ToString("F3", CultureInfo.InvariantCulture) + ".", E = p.E, N = p.N, Points = new List<SurveyPoint> { p, q } });
                 }
             // 3 missing code, 4 zero elevation
             for (int i = 0; i < pts.Count; i++)
             {
                 var p = pts[i];
-                if (PointText.Clean(p.Desc).Length == 0) res.Add(new QaIssue { Kind = "No code", PointNo = Id(p, i), Text = "Point has no description.", E = p.E, N = p.N });
-                if (!p.HasZ || p.Z == 0) res.Add(new QaIssue { Kind = "No elevation", PointNo = Id(p, i), Text = "Elevation is missing or exactly zero.", E = p.E, N = p.N });
+                if (PointText.Clean(p.Desc).Length == 0) res.Add(new QaIssue { Kind = "No code", PointNo = Id(p, i), Text = "Point has no description.", E = p.E, N = p.N, Points = new List<SurveyPoint> { p } });
+                if (!p.HasZ || p.Z == 0) res.Add(new QaIssue { Kind = "No elevation", PointNo = Id(p, i), Text = "Elevation is missing or exactly zero.", E = p.E, N = p.N, Points = new List<SurveyPoint> { p } });
             }
             // 5 spikes and 6 isolated points, inside each category (needs enough points)
             foreach (var grp in pts.Select((p, i) => new { p, i }).Where(x => x.p.HasZ && x.p.Z != 0).GroupBy(x => x.p.Category))
@@ -350,13 +350,13 @@ namespace BPlus.LiveMap.Core
                     }
                     var near = cand.Select(j => new { j, d = Math.Sqrt(Math.Pow(list[j].p.E - p.E, 2) + Math.Pow(list[j].p.N - p.N, 2)) }).OrderBy(t => t.d).Take(4).ToList();
                     if (near.Count == 0 || near[0].d > o.FarDist)
-                        res.Add(new QaIssue { Kind = "Far from others", PointNo = Id(p, list[k].i), Text = near.Count == 0 ? "No other point of the same code nearby." : "Nearest point of the same code is " + near[0].d.ToString("F1", CultureInfo.InvariantCulture) + " away.", E = p.E, N = p.N });
+                        res.Add(new QaIssue { Kind = "Far from others", PointNo = Id(p, list[k].i), Text = near.Count == 0 ? "No other point of the same code nearby." : "Nearest point of the same code is " + near[0].d.ToString("F1", CultureInfo.InvariantCulture) + " away.", E = p.E, N = p.N, Points = new List<SurveyPoint> { p } });
                     if (near.Count >= 3)
                     {
                         var zs = near.Select(t => list[t.j].p.Z).OrderBy(z => z).ToList();
                         double med = zs.Count % 2 == 1 ? zs[zs.Count / 2] : (zs[zs.Count / 2 - 1] + zs[zs.Count / 2]) / 2;
                         if (Math.Abs(p.Z - med) > o.SpikeThreshold)
-                            res.Add(new QaIssue { Kind = "Elevation spike", PointNo = Id(p, list[k].i), Text = "Elevation " + p.Z.ToString("F3", CultureInfo.InvariantCulture) + " differs by " + Math.Abs(p.Z - med).ToString("F3", CultureInfo.InvariantCulture) + " from its neighbours.", E = p.E, N = p.N });
+                            res.Add(new QaIssue { Kind = "Elevation spike", PointNo = Id(p, list[k].i), Text = "Elevation " + p.Z.ToString("F3", CultureInfo.InvariantCulture) + " differs by " + Math.Abs(p.Z - med).ToString("F3", CultureInfo.InvariantCulture) + " from its neighbours.", E = p.E, N = p.N, Points = new List<SurveyPoint> { p } });
                     }
                 }
             }
@@ -366,7 +366,6 @@ namespace BPlus.LiveMap.Core
 
     public static class Geo2D
     {
-        public const double FeddanM2 = 4200.833; // Egyptian feddan; 24 qirat, 1 qirat = 24 sahm
         public static double Distance(double e1, double n1, double e2, double n2) { double dx = e2 - e1, dy = n2 - n1; return Math.Sqrt(dx * dx + dy * dy); }
         public static double Azimuth(double e1, double n1, double e2, double n2)
         {
@@ -395,12 +394,6 @@ namespace BPlus.LiveMap.Core
             for (int i = 0; i < c - 1; i++) s += Distance(e[i], n[i], e[i + 1], n[i + 1]);
             if (closed && c > 2) s += Distance(e[c - 1], n[c - 1], e[0], n[0]);
             return s;
-        }
-        public static string Feddan(double m2)
-        {
-            double f = m2 / FeddanM2; int fed = (int)Math.Floor(f + 1e-9); double rem = (f - fed) * 24; int q = (int)Math.Floor(rem + 1e-9); int s = (int)Math.Round((rem - q) * 24);
-            if (s >= 24) { s = 0; q++; } if (q >= 24) { q = 0; fed++; }
-            return fed + " feddan " + q + " qirat " + s + " sahm";
         }
     }
 }

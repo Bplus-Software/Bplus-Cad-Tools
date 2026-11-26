@@ -107,8 +107,6 @@ public class SurveyTests
         Assert.Equal(5, Geo2D.Distance(0, 0, 3, 4), 9);
         Assert.Equal(100, Geo2D.PolygonArea(new[] { 0.0, 10, 10, 0 }, new[] { 0.0, 0, 10, 10 }), 9);
         Assert.Equal(40, Geo2D.Perimeter(new[] { 0.0, 10, 10, 0 }, new[] { 0.0, 0, 10, 10 }, true), 9);
-        Assert.Equal("1 feddan 0 qirat 0 sahm", Geo2D.Feddan(4200.833)); Assert.Equal("0 feddan 12 qirat 0 sahm", Geo2D.Feddan(2100.4165));
-        Assert.Equal("2 feddan 5 qirat 12 sahm", Geo2D.Feddan(2 * 4200.833 + 5 * 175.034708 + 12 * 7.2931128));
     }
     [Fact] public void ConnectByCodeAndNumber()
     {
@@ -125,4 +123,28 @@ public class SurveyTests
         Assert.Single(Connect.Build(pts, false, false)); Assert.Equal(10, Connect.Build(pts, false, false)[0].Pts.Count);
         Assert.Equal("FENCE", Connect.Build(pts, true, true, new[] { "FENCE" }).Single().Code);
     }
+}
+
+public class UpdateTests
+{
+    const string Json = "[{\"tag_name\":\"v1.1\",\"prerelease\":true,\"assets\":[]},{\"tag_name\":\"cadtools-v0.3.1\",\"html_url\":\"https://github.com/Bplus-Software/Bplus-Cad-Tools/releases/tag/cadtools-v0.3.1\",\"prerelease\":true,\"assets\":[{\"name\":\"BPlusCadTools-Setup.exe\",\"browser_download_url\":\"https://github.com/Bplus-Software/Bplus-Cad-Tools/releases/download/cadtools-v0.3.1/BPlusCadTools-Setup.exe\"},{\"name\":\"SHA256SUMS.txt\",\"browser_download_url\":\"https://github.com/Bplus-Software/Bplus-Cad-Tools/releases/download/cadtools-v0.3.1/SHA256SUMS.txt\"}]},{\"tag_name\":\"cadtools-v0.10.0\",\"draft\":false,\"prerelease\":true,\"assets\":[{\"name\":\"BPlusCadTools-Setup.exe\",\"browser_download_url\":\"https://github.com/Bplus-Software/Bplus-Cad-Tools/releases/download/cadtools-v0.10.0/BPlusCadTools-Setup.exe\"},{\"name\":\"SHA256SUMS.txt\",\"browser_download_url\":\"https://github.com/Bplus-Software/Bplus-Cad-Tools/releases/download/cadtools-v0.10.0/SHA256SUMS.txt\"}]},{\"tag_name\":\"cadtools-v9.9.9\",\"assets\":[{\"name\":\"BPlusCadTools-Setup.exe\",\"browser_download_url\":\"https://evil.example/x.exe\"},{\"name\":\"SHA256SUMS.txt\",\"browser_download_url\":\"https://evil.example/s\"}]},{\"tag_name\":\"cadtools-v0.11.0\",\"assets\":[{\"name\":\"BPlusCadTools-Setup.exe\",\"browser_download_url\":\"https://github.com/Bplus-Software/x\"}]}]";
+    [Fact] public void PicksNewestByNumberNotText()
+    {
+        var u = Updater.Newest(Json); Assert.Equal("0.10.0", u.Version); Assert.Equal("cadtools-v0.10.0", u.Tag); Assert.True(u.Prerelease);
+    }
+    [Fact] public void IgnoresOtherHostsAndIncompleteReleases() { var u = Updater.Newest(Json); Assert.StartsWith("https://github.com/Bplus-Software/", u.InstallerUrl); Assert.NotEqual("9.9.9", u.Version); Assert.NotEqual("0.11.0", u.Version); }
+    [Fact] public void NewerCheck()
+    {
+        var u = Updater.Newest(Json); Assert.True(Updater.IsNewer(u, "0.3.2-experimental")); Assert.False(Updater.IsNewer(u, "0.10.0-experimental")); Assert.False(Updater.IsNewer(u, "0.11.0")); Assert.False(Updater.IsNewer(null, "0.1.0")); Assert.False(Updater.IsNewer(u, "garbage"));
+    }
+    [Fact] public void NoReleaseMeansNull() { Assert.Null(Updater.Newest("[]")); Assert.ThrowsAny<Exception>(() => Updater.Newest("{}")); Assert.ThrowsAny<Exception>(() => Updater.Newest("[{")); }
+    [Fact] public void HashLookup()
+    {
+        string h = new string('a', 64), g = new string('B', 64);
+        var t = h + "  BPlusCadTools-Setup.exe\r\n" + g + " *bundle.zip\r\n";
+        Assert.Equal(h, Updater.HashFor(t, "BPlusCadTools-Setup.exe")); Assert.Equal(g.ToLowerInvariant(), Updater.HashFor(t, "bundle.zip")); Assert.Null(Updater.HashFor(t, "other.exe")); Assert.Null(Updater.HashFor("nothex" + new string(' ', 60) + "BPlusCadTools-Setup.exe", "BPlusCadTools-Setup.exe"));
+    }
+    [Fact] public void Sha256OfBytes() { using (var m = new System.IO.MemoryStream(new byte[] { 97, 98, 99 })) Assert.Equal("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", Updater.Sha256Hex(m)); }
+    [Fact] public void JsonEscapes() { var d = (System.Collections.Generic.Dictionary<string, object>)MiniJson.Parse("{\"a\":\"x\\u0041\\n\\\"q\\\"\",\"b\":[1,2.5,true,null]}"); Assert.Equal("xA\n\"q\"", d["a"]); Assert.Equal(4, ((System.Collections.Generic.List<object>)d["b"]).Count); }
+    [Fact] public void VersionParsing() { Assert.Equal(new Version(0, 3, 2, 0), Updater.ParseVersion("0.3.2-experimental")); Assert.Null(Updater.ParseVersion("abc")); Assert.Null(Updater.ParseVersion("1")); }
 }

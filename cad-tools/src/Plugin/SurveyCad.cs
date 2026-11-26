@@ -70,7 +70,7 @@ namespace BPlus.LiveMap
                     var dp = ent as DBPoint;
                     if (dp != null)
                     {
-                        seq++; var sp = new SurveyPoint { No = "", E = dp.Position.X, N = dp.Position.Y, Z = dp.Position.Z, HasZ = true };
+                        seq++; var sp = new SurveyPoint { No = "", E = dp.Position.X, N = dp.Position.Y, Z = dp.Position.Z, HasZ = true, Ref = id.Handle.ToString() };
                         var rb = dp.GetXDataForApplication(XApp);
                         if (rb != null) { var v = rb.AsArray(); if (v.Length > 1) sp.No = Convert.ToString(v[1].Value); if (v.Length > 2) sp.Desc = Convert.ToString(v[2].Value); }
                         if (sp.No.Length == 0) sp.No = "";
@@ -80,7 +80,7 @@ namespace BPlus.LiveMap
                     {
                         try
                         {
-                            var sp = new SurveyPoint { No = Convert.ToString(Prop(ent, "PointNumber")), E = Dbl(Prop(ent, "Easting")), N = Dbl(Prop(ent, "Northing")), Z = Dbl(Prop(ent, "Elevation")), Desc = Convert.ToString(Prop(ent, "RawDescription")) ?? "" };
+                            var sp = new SurveyPoint { No = Convert.ToString(Prop(ent, "PointNumber")), E = Dbl(Prop(ent, "Easting")), N = Dbl(Prop(ent, "Northing")), Z = Dbl(Prop(ent, "Elevation")), Desc = Convert.ToString(Prop(ent, "RawDescription")) ?? "", Ref = id.Handle.ToString() };
                             res.Add(new CadPoint { Id = id, P = sp, IsCogo = true });
                         }
                         catch (Exception e) { Log.Write("COGO read: " + e.Message); }
@@ -183,10 +183,34 @@ namespace BPlus.LiveMap
             return n;
         }
 
-        public static void ZoomTo(Document doc, double e, double n)
+        static Autodesk.AutoCAD.DatabaseServices.Circle _mark;
+        public static void ClearMark()
+        {
+            try { if (_mark != null) { Autodesk.AutoCAD.GraphicsInterface.TransientManager.CurrentTransientManager.EraseTransient(_mark, new IntegerCollection()); _mark.Dispose(); } } catch (Exception e) { Log.Write("ClearMark: " + e.Message); }
+            _mark = null;
+        }
+
+        // World point to the view's own coordinates (works for any view direction and twist), so the view centre lands exactly on the point.
+        public static Point2d ToDcs(ViewTableRecord v, Point3d wcs)
+        {
+            var m = Matrix3d.Rotation(-v.ViewTwist, v.ViewDirection, v.Target) * Matrix3d.Displacement(v.Target - Point3d.Origin) * Matrix3d.PlaneToWorld(v.ViewDirection);
+            var p = wcs.TransformBy(m.Inverse()); return new Point2d(p.X, p.Y);
+        }
+
+        public static void ZoomTo(Document doc, double e, double n, double z)
         {
             var ed = doc.Editor; var v = ed.GetCurrentView();
-            v.CenterPoint = new Point2d(e, n); ed.SetCurrentView(v);
+            var wcs = new Point3d(e, n, z);
+            double oldH = v.Height, h = Math.Min(oldH, 60.0); if (h <= 0) h = 60.0;
+            v.Width = v.Width * (h / (oldH > 0 ? oldH : h)); v.Height = h;
+            v.CenterPoint = ToDcs(v, wcs); ed.SetCurrentView(v);
+            ClearMark();
+            try
+            {
+                _mark = new Autodesk.AutoCAD.DatabaseServices.Circle(wcs, Vector3d.ZAxis, h / 40.0) { ColorIndex = 1 };
+                Autodesk.AutoCAD.GraphicsInterface.TransientManager.CurrentTransientManager.AddTransient(_mark, Autodesk.AutoCAD.GraphicsInterface.TransientDrawingMode.Highlight, 128, new IntegerCollection());
+            }
+            catch (Exception ex) { Log.Write("Mark: " + ex.Message); }
         }
 
         public static string Azi(double a) { return Geo2D.Dms(a); }

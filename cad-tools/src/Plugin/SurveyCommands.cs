@@ -69,12 +69,23 @@ namespace BPlus.LiveMap
                 var doc = Doc; var pts = SurveyCad.Collect(doc);
                 if (pts.Count == 0) { doc.Editor.WriteMessage("\n[BPlus] No points found in model space.\n"); return; }
                 var issues = SurveyQa.Run(pts.Select(p => p.P).ToList(), new QaOptions());
-                int sel = -1;
-                while (true)
+                int sel = -1; var byHandle = pts.Where(p => !string.IsNullOrEmpty(p.P.Ref)).GroupBy(p => p.P.Ref).ToDictionary(g => g.Key, g => g.First().Id);
+                try
                 {
-                    int i = SurveyUi.Qa(issues, pts.Count, sel); if (i < 0) break;
-                    sel = i; SurveyCad.ZoomTo(doc, issues[i].E, issues[i].N);
+                    while (true)
+                    {
+                        int action, row; List<SurveyUi.QaRow> rows;
+                        SurveyUi.Qa(issues, pts.Count, sel, out action, out row, out rows);
+                        if (action == 0 || row < 0) break;
+                        sel = row;
+                        if (action == 1) { var q = rows[row].P; SurveyCad.ZoomTo(doc, q.E, q.N, q.HasZ ? q.Z : 0); continue; }
+                        var ids = rows.Where(r => r.Issue == rows[row].Issue && r.P.Ref != null && byHandle.ContainsKey(r.P.Ref)).Select(r => byHandle[r.P.Ref]).Distinct().ToArray();
+                        if (ids.Length > 0) { doc.Editor.SetImpliedSelection(ids); doc.Editor.WriteMessage("\n[B+] " + ids.Length + " point(s) selected. Press Delete, move them, or Esc.\n"); }
+                        else doc.Editor.WriteMessage("\n[B+] These points are not in the drawing as objects, so they cannot be selected.\n");
+                        break;
+                    }
                 }
+                finally { SurveyCad.ClearMark(); }
             });
         }
 
@@ -125,6 +136,7 @@ namespace BPlus.LiveMap
                 var doc = Doc; var ed = doc.Editor;
                 var psr = ed.GetSelection(new PromptSelectionOptions { MessageForAdding = "\nSelect closed polylines" }, new SelectionFilter(new[] { new TypedValue((int)DxfCode.Start, "LWPOLYLINE,POLYLINE") }));
                 if (psr.Status != PromptStatus.OK) return;
+                try { var iu = Convert.ToInt32(AcApp.GetSystemVariable("INSUNITS")); if (iu != 6 && iu != 0) ed.WriteMessage("\n[B+] Note: this drawing's units (INSUNITS=" + iu + ") are not metres. Results below are in drawing units, shown as m and m2."); } catch { }
                 var kw = new PromptKeywordOptions("\nPlace an area label for each? [Yes/No] <No>: ", "Yes No") { AllowNone = true }; var kr = ed.GetKeywords(kw);
                 bool label = kr.Status == PromptStatus.OK && kr.StringResult == "Yes";
                 double total = 0; int n = 0, skipped = 0;
@@ -140,18 +152,18 @@ namespace BPlus.LiveMap
                         for (int i = 0; i < pl.NumberOfVertices; i++) { var p = pl.GetPoint2dAt(i); e.Add(p.X); nn.Add(p.Y); if (Math.Abs(pl.GetBulgeAt(i)) > 1e-9) bulge = true; }
                         double a = bulge ? pl.Area : Geo2D.PolygonArea(e, nn); double per = bulge ? pl.Length : Geo2D.Perimeter(e, nn, true);
                         total += a; n++;
-                        ed.WriteMessage("\n" + F2(a) + " m2   " + Geo2D.Feddan(a) + "   perimeter " + F2(per) + " m");
+                        ed.WriteMessage("\n" + F2(a) + " m2   perimeter " + F2(per) + " m");
                         if (label)
                         {
                             Point3d c; try { var ext = pl.GeometricExtents; c = new Point3d((ext.MinPoint.X + ext.MaxPoint.X) / 2, (ext.MinPoint.Y + ext.MaxPoint.Y) / 2, 0); } catch { c = Point3d.Origin; }
                             double h = Math.Max(0.1, Math.Min(pl.GeometricExtents.MaxPoint.X - pl.GeometricExtents.MinPoint.X, pl.GeometricExtents.MaxPoint.Y - pl.GeometricExtents.MinPoint.Y) / 20);
-                            var mt = new MText { Contents = F2(a) + " m2\\P" + Geo2D.Feddan(a), Location = c, TextHeight = h, Attachment = AttachmentPoint.MiddleCenter, LayerId = pl.LayerId };
+                            var mt = new MText { Contents = F2(a) + " m2", Location = c, TextHeight = h, Attachment = AttachmentPoint.MiddleCenter, LayerId = pl.LayerId };
                             ms.AppendEntity(mt); tr.AddNewlyCreatedDBObject(mt, true);
                         }
                     }
                     tr.Commit();
                 }
-                ed.WriteMessage("\n" + n + " polyline(s), total " + F2(total) + " m2 = " + Geo2D.Feddan(total) + (skipped > 0 ? "   (" + skipped + " skipped: open or not a polyline)" : "") + "\n");
+                ed.WriteMessage("\n" + n + " polyline(s), total " + F2(total) + " m2" + (skipped > 0 ? "   (" + skipped + " skipped: open or not a polyline)" : "") + "\n");
             });
         }
 
@@ -179,5 +191,28 @@ namespace BPlus.LiveMap
                 ed.WriteMessage("\n[BPlus] Shifted " + n + " object(s) by " + F2(d[0]) + ", " + F2(d[1]) + ", " + F2(d[2]) + ". UNDO reverses it.\n");
             });
         }
+    }
+}
+
+namespace BPlus.LiveMap
+{
+    public partial class Commands
+    {
+        [CommandMethod("BPSETTINGS")] public static void GeneralSet() { Guard("BPSETTINGS", GeneralSettings.Show); }
+        [CommandMethod("BPUPDATE")] public static void Update() { Guard("BPUPDATE", UpdateCheck.Manual); }
+        [CommandMethod("BPABOUT")]
+        public static void About()
+        {
+            Guard("BPABOUT", () => System.Windows.Forms.MessageBox.Show("B+ CAD Tools " + App.Version + "\nExperimental pre-release for AutoCAD and Civil 3D 2021 to 2026.\nUpdates: github.com/Bplus-Software/Bplus-Cad-Tools\nSettings and log: " + Paths.Dir, "About B+ CAD Tools", System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Information));
+        }
+        static void SetKind(MapKind k, string name) { Guard("BPMAP", () => { Config.Kind = k; Engine.RefreshNow(); Doc.Editor.WriteMessage("\n[B+] Map type: " + name + (Engine.On ? "" : ". The map is off: click Live map to show it.") + "\n"); }); }
+        static void SetOpacity(int p) { Guard("BPMAP", () => { Config.OpacityPercent = p; Engine.RefreshNow(); Doc.Editor.WriteMessage("\n[B+] Map opacity: " + p + "%\n"); }); }
+        [CommandMethod("BPMAPSAT")] public static void MapSat() { SetKind(MapKind.Satellite, "Satellite"); }
+        [CommandMethod("BPMAPROAD")] public static void MapRoad() { SetKind(MapKind.Roadmap, "Roadmap"); }
+        [CommandMethod("BPMAPHYB")] public static void MapHyb() { SetKind(MapKind.Hybrid, "Hybrid"); }
+        [CommandMethod("BPMAPOP100")] public static void Op100() { SetOpacity(100); }
+        [CommandMethod("BPMAPOP75")] public static void Op75() { SetOpacity(75); }
+        [CommandMethod("BPMAPOP50")] public static void Op50() { SetOpacity(50); }
+        [CommandMethod("BPMAPOP25")] public static void Op25() { SetOpacity(25); }
     }
 }

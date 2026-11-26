@@ -33,14 +33,20 @@ namespace BPlus.LiveMap
                 AddPanel(tab, "Points", L("Import points", "BPIMPORT ", "import", "Import a points file (txt, csv, xlsx) as points with codes and layers"), L("Export points", "BPEXPORT ", "export", "Export points to a clean text or csv file"), L("Show / hide", "BPISOLATE ", "layers", "Show or hide point categories"), L("Codes", "BPCODES ", "codes", "Edit the point code rules"));
                 AddPanel(tab, "Draw", L("Connect points", "BPCONNECT ", "connect", "Draw lines through points by code and point number"));
                 AddPanel(tab, "Survey QA", L("QA / QC", "BPQAQC ", "qa", "Check points: repeated numbers, duplicates, missing code or elevation, spikes"), L("Shift", "BPSHIFT ", "shift", "Move the selection by dE, dN, dZ"));
-                AddPanel(tab, "Quantities", L("Area", "BPAREA ", "area", "Area of closed polylines in m2, feddan, qirat, sahm"), L("Distance", "BPDIST ", "dist", "Distance, azimuth and bearing between two points"));
+                AddPanel(tab, "Quantities", L("Area", "BPAREA ", "area", "Area of closed polylines in m2, with perimeter in m"), L("Distance", "BPDIST ", "dist", "Distance, azimuth and bearing between two points"));
                 var src = new RibbonPanelSource { Title = "Live Map" };
                 var panel = new RibbonPanel { Source = src };
                 var main = new RibbonButton { Text = "Live map", ShowText = true, ShowImage = true, Size = RibbonItemSize.Large, Orientation = System.Windows.Controls.Orientation.Vertical, LargeImage = Icon(32, "map"), Image = Icon(16, "map"), CommandHandler = new Cmd(), CommandParameter = "BPGMAP ", ToolTip = "Show or hide the live Google map behind the drawing" };
                 src.Items.Add(main);
                 var split = new RibbonSplitButton { Text = "Options", ShowText = true, ShowImage = true, Size = RibbonItemSize.Large, Orientation = System.Windows.Controls.Orientation.Vertical, LargeImage = Icon(32, "gear"), Image = Icon(16, "gear"), IsSplit = false, ListButtonStyle = Autodesk.Private.Windows.RibbonListButtonStyle.MenuButton };
-                split.Items.Add(Item("Map type...", "BPGMAPTYPE "));
-                split.Items.Add(Item("Opacity...", "BPGMAPOPACITY "));
+                split.Items.Add(Item("Satellite", "BPMAPSAT "));
+                split.Items.Add(Item("Roadmap", "BPMAPROAD "));
+                split.Items.Add(Item("Hybrid (satellite + labels)", "BPMAPHYB "));
+                split.Items.Add(new RibbonSeparator());
+                split.Items.Add(Item("Opacity 100%", "BPMAPOP100 "));
+                split.Items.Add(Item("Opacity 75%", "BPMAPOP75 "));
+                split.Items.Add(Item("Opacity 50%", "BPMAPOP50 "));
+                split.Items.Add(Item("Opacity 25%", "BPMAPOP25 "));
                 split.Items.Add(Item("Refresh map", "BPGMAPREFRESH "));
                 split.Items.Add(new RibbonSeparator());
                 split.Items.Add(Item("Coordinate system...", "BPGMAPCS "));
@@ -49,8 +55,10 @@ namespace BPlus.LiveMap
                 split.Items.Add(new RibbonSeparator());
                 split.Items.Add(Item("Settings and Google key...", "BPGMAPSET "));
                 split.Items.Add(Item("Check installation", "BPCHECK "));
+                try { split.Current = null; split.Text = "Options"; } catch (Exception ex) { Log.Write("Split label: " + ex.Message); }
                 src.Items.Add(split);
                 tab.Panels.Add(panel);
+                AddPanel(tab, "Settings", L("Settings", "BPSETTINGS ", "gear", "Options, point defaults, updates"), L("Check updates", "BPUPDATE ", "update", "Check GitHub for a newer version and install it"), L("About", "BPABOUT ", "about", "Version and where settings are kept"));
                 rc.Tabs.Add(tab);
                 Log.Write("Ribbon tab added.");
                 return true;
@@ -128,6 +136,15 @@ namespace BPlus.LiveMap
                 {
                     var poly = new[] { new PointF(k(5), k(22)), new PointF(k(9), k(7)), new PointF(k(25), k(5)), new PointF(k(27), k(24)) };
                     using (var br = new SolidBrush(Color.FromArgb(70, 235, 238, 242))) g.FillPolygon(br, poly); g.DrawPolygon(white, poly);
+                }
+                else if (kind == "update")
+                {
+                    g.DrawArc(white, k(5), k(5), k(22), k(22), 30, 270); g.DrawLines(white, new[] { new PointF(k(22), k(3)), new PointF(k(26), k(10)), new PointF(k(18), k(11)) });
+                    g.DrawLine(white, k(16), k(11), k(16), k(20)); g.DrawLines(white, new[] { new PointF(k(12), k(17)), new PointF(k(16), k(21)), new PointF(k(20), k(17)) });
+                }
+                else if (kind == "about")
+                {
+                    g.DrawEllipse(white, k(4), k(4), k(24), k(24)); g.DrawLine(white, k(16), k(14), k(16), k(23)); g.FillEllipse(Brushes.White, k(14.5f), k(8.5f), k(3), k(3));
                 }
                 else if (kind == "dist")
                 {
