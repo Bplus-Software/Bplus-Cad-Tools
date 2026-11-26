@@ -16,7 +16,7 @@ namespace BPlus.LiveMap
             using (var f = Theme.Base(import ? "Import points" : "Export points", 560, 430))
             {
                 f.Controls.Add(Theme.Lbl("Format", 20, 14, 200, true));
-                var rbs = new RadioButton[5];
+                var rbs = new RadioButton[5]; int sel = 0; bool busy = false;
                 for (int i = 0; i < 5; i++)
                 {
                     int y = 38 + i * 40;
@@ -26,13 +26,16 @@ namespace BPlus.LiveMap
                     row.Controls.Add(rb); row.Controls.Add(sub);
                     if (Unver[i]) row.Controls.Add(new Label { Text = "unverified", Left = 430, Top = 7, Width = 80, Height = 20, ForeColor = Color.FromArgb(230, 160, 40), BackColor = Color.Transparent });
                     row.Click += (s, e) => rb.Checked = true; sub.Click += (s, e) => rb.Checked = true;
-                    rbs[i] = rb; f.Controls.Add(row);
+                    rbs[i] = rb; int idx = i;
+                    // each radio sits in its own panel, so WinForms does not make them exclusive: do it by hand
+                    rb.CheckedChanged += (s, e) => { if (busy || !rb.Checked) return; busy = true; sel = idx; for (int k = 0; k < 5; k++) if (k != idx && rbs[k] != null) rbs[k].Checked = false; busy = false; };
+                    f.Controls.Add(row);
                 }
                 f.Controls.Add(Theme.Lbl(import ? "After you choose, the file opens in the import window (columns, codes, layers)." : "Next: the usual export options (order, categories, file name).", 20, 242, 520, true));
                 f.Controls.Add(new Label { Text = "Unverified = written from the format spec, not yet tested with a real instrument file.", Left = 20, Top = 264, Width = 520, Height = 20, ForeColor = Color.FromArgb(230, 160, 40), BackColor = Color.Transparent });
                 var ok = Theme.Btn(import ? "Choose file..." : "Export...", 350, 384, 100, true); var cancel = Theme.Btn("Cancel", 460, 384, 80);
                 int result = -1;
-                ok.Click += (s, e) => { for (int i = 0; i < 5; i++) if (rbs[i].Checked) result = i; f.DialogResult = DialogResult.OK; };
+                ok.Click += (s, e) => { result = sel; f.DialogResult = DialogResult.OK; };
                 cancel.Click += (s, e) => f.DialogResult = DialogResult.Cancel;
                 f.Controls.Add(ok); f.Controls.Add(cancel); f.AcceptButton = ok; f.CancelButton = cancel;
                 f.ShowDialog();

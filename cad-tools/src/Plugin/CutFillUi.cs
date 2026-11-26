@@ -33,7 +33,10 @@ namespace BPlus.LiveMap
                 f.Controls.Add(Theme.Lbl("Cut = existing ground above the comparison. Fill = below it.", 16, 384, 500, true));
                 f.Controls.Add(Theme.Lbl("The factor multiplies the cut volume in the Net line only. 1.00 = no change.", 16, 410, 500, true));
                 f.Controls.Add(Theme.Lbl("The report is shown first. Nothing is drawn unless you ask for the table.", 16, 436, 500, true));
-                f.Controls.AddRange(new Control[] { e0, e1, p0, p1, p2, lv, gr, a0, a1, c, sw });
+                // Each group of radio buttons sits in its own panel, otherwise WinForms makes all seven exclusive together.
+                Action<int, int, Control[]> grp = (top, h, items) => { var pn = new Panel { Left = 0, Top = top, Width = 540, Height = h, BackColor = Color.Transparent }; foreach (var it in items) { it.Top -= top; pn.Controls.Add(it); } f.Controls.Add(pn); };
+                grp(34, 56, new Control[] { e0, e1 }); grp(124, 84, new Control[] { p0, p1, p2, lv, gr }); grp(242, 56, new Control[] { a0, a1 });
+                f.Controls.AddRange(new Control[] { c, sw });
                 var ok = Theme.Btn("Report", 322, 596, 120, true); var cancel = Theme.Btn("Cancel", 452, 596, 72); CutFillChoice res = null;
                 ok.Click += (s, e) =>
                 {
