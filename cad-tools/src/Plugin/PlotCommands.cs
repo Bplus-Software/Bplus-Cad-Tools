@@ -57,20 +57,22 @@ namespace BPlus.LiveMap
             return "";
         }
 
-        static string MediaText(PlotSettings ps)
+        static string MediaText(PlotSettings src)
         {
-            string c = ""; try { c = ps.CanonicalMediaName; } catch { }
+            string c = ""; try { c = src.CanonicalMediaName; } catch { }
             if (string.IsNullOrEmpty(c)) return "(none)";
-            try { return PlotSettingsValidator.Current.GetLocaleMediaName(ps, c); } catch { return c; }
+            // The validator works on a scratch copy, never on the layout opened from the drawing.
+            try { using (var ps = new PlotSettings(src.ModelType)) { ps.CopyFrom(src); return PlotSettingsValidator.Current.GetLocaleMediaName(ps, c); } } catch { return c; }
         }
 
-        static PlotInfo BuildInfo(Layout lo, PlotChoice ch, double unit, out string how)
+        static PlotInfo BuildInfo(Layout lo, PlotChoice ch, double unit, out string how, out PlotSettings keep)
         {
             var psv = PlotSettingsValidator.Current; var pi = new PlotInfo { Layout = lo.ObjectId }; how = "";
             bool hasDevice = !string.IsNullOrEmpty(lo.PlotConfigurationName) && !lo.PlotConfigurationName.Equals("None", StringComparison.OrdinalIgnoreCase);
             bool custom = !ch.OwnSetup || !hasDevice || string.IsNullOrEmpty(lo.CanonicalMediaName);
-            using (var ps = new PlotSettings(lo.ModelType))
+            keep = null;
             {
+                var ps = new PlotSettings(lo.ModelType); keep = ps;
                 ps.CopyFrom(lo);
                 if (custom)
                 {
@@ -102,18 +104,28 @@ namespace BPlus.LiveMap
             {
                 var doc = Doc; var ed = doc.Editor; var db = doc.Database; var inv = CultureInfo.InvariantCulture;
                 if (PlotFactory.ProcessPlotState != ProcessPlotState.NotPlotting) { ed.WriteMessage("\n[B+] AutoCAD is plotting right now. Wait for it to finish.\n"); return; }
-                double unit = DrawingCs.UnitToMetre(db); string drawing = Path.GetFileNameWithoutExtension(doc.Name);
+                Log.Write("BPPLOT: start"); double unit = DrawingCs.UnitToMetre(db); string drawing = Path.GetFileNameWithoutExtension(doc.Name);
                 var rows = new List<LayoutRow>();
                 using (var tr = db.TransactionManager.StartTransaction())
                 {
                     var ld = (DBDictionary)tr.GetObject(db.LayoutDictionaryId, OpenMode.ForRead); var list = new List<Layout>();
                     foreach (DBDictionaryEntry en in ld) { var lo = (Layout)tr.GetObject(en.Value, OpenMode.ForRead); if (!lo.ModelType) list.Add(lo); }
-                    foreach (var lo in list.OrderBy(l => l.TabOrder)) rows.Add(new LayoutRow { Name = lo.LayoutName, Setup = string.IsNullOrEmpty(lo.PlotSettingsName) ? "(none)" : lo.PlotSettingsName, Paper = MediaText(lo), Scale = ScaleText(lo, unit) });
+                    Log.Write("BPPLOT: reading " + list.Count + " layouts"); foreach (var lo in list.OrderBy(l => l.TabOrder)) rows.Add(new LayoutRow { Name = lo.LayoutName, Setup = string.IsNullOrEmpty(lo.PlotSettingsName) ? "(none)" : lo.PlotSettingsName, Paper = MediaText(lo), Scale = ScaleText(lo, unit) });
                     tr.Commit();
                 }
                 if (rows.Count == 0) { ed.WriteMessage("\n[B+] This drawing has no layouts (only the Model tab).\n"); return; }
                 string folder = Path.GetDirectoryName(doc.Name); if (string.IsNullOrEmpty(folder) || !Directory.Exists(folder)) folder = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-                var ch = PlotUi.Ask(rows, drawing, folder, PlotLists.Read()); if (ch == null) return;
+                try
+                {
+                    if (Convert.ToInt32(AcApp.GetSystemVariable("DBMOD")) != 0)
+                    {
+                        var r = System.Windows.Forms.MessageBox.Show("This drawing has unsaved changes.\r\n\r\nPlotting talks to the printer drivers, and a driver problem can close AutoCAD without warning.\r\nSave the drawing first?", "B+ CAD Tools - Plot layouts", System.Windows.Forms.MessageBoxButtons.YesNoCancel);
+                        if (r == System.Windows.Forms.DialogResult.Cancel) return;
+                        if (r == System.Windows.Forms.DialogResult.Yes) { doc.Database.SaveAs(doc.Name, true, DwgVersion.Current, doc.Database.SecurityParameters); }
+                    }
+                }
+                catch (System.Exception ex) { Log.Write("Plot save check: " + ex.Message); }
+                Log.Write("BPPLOT: layouts listed, reading printer lists"); var lists = PlotLists.Read(); Log.Write("BPPLOT: opening dialog"); var ch = PlotUi.Ask(rows, drawing, folder, lists); if (ch == null) return; Log.Write("BPPLOT: dialog OK, plotting " + ch.Layouts.Count + " layout(s)");
                 if (ch.Pdf) { try { Directory.CreateDirectory(ch.Folder); } catch (System.Exception ex) { ed.WriteMessage("\n[B+] Cannot use that folder: " + ex.Message + "\n"); return; } }
 
                 var done = new List<string>(); var failed = new List<string>(); object oldBg = null; string oldLayout = null;
@@ -121,54 +133,63 @@ namespace BPlus.LiveMap
                 try { oldLayout = LayoutManager.Current.CurrentLayout; } catch { }
                 try
                 {
+                    var keepers = new List<PlotSettings>();
                     using (doc.LockDocument())
-                    using (var tr = db.TransactionManager.StartTransaction())
-                    using (var pe = PlotFactory.CreatePublishEngine())
                     {
-                        var ld = (DBDictionary)tr.GetObject(db.LayoutDictionaryId, OpenMode.ForRead);
-                        var pis = new List<KeyValuePair<string, PlotInfo>>();
-                        foreach (var name in ch.Layouts)
+                        try
                         {
-                            try
+                            var pis = new List<KeyValuePair<string, PlotInfo>>();
+                            foreach (var name in ch.Layouts)
                             {
-                                LayoutManager.Current.CurrentLayout = name;
-                                var lo = (Layout)tr.GetObject(ld.GetAt(name), OpenMode.ForRead); string how;
-                                var pi = BuildInfo(lo, ch, unit, out how); pis.Add(new KeyValuePair<string, PlotInfo>(name, pi));
-                            }
-                            catch (System.Exception ex) { failed.Add(name + ": " + ex.Message); }
-                        }
-                        if (pis.Count > 0)
-                        {
-                            pe.BeginPlot(null, null);
-                            if (ch.Pdf && ch.Combined)
-                            {
-                                string path = PlotNaming.Unique(ch.Folder, PlotNaming.FileName("{drawing}", drawing, ""), ".pdf", File.Exists);
-                                pe.BeginDocument(pis[0].Value, doc.Name, null, 1, true, path);
-                                for (int i = 0; i < pis.Count; i++)
+                                try
                                 {
-                                    try { LayoutManager.Current.CurrentLayout = pis[i].Key; } catch { }
-                                    var pp = new PlotPageInfo(); pe.BeginPage(pp, pis[i].Value, i == pis.Count - 1, null); pe.BeginGenerateGraphics(null); pe.EndGenerateGraphics(null); pe.EndPage(null);
-                                }
-                                pe.EndDocument(null); done.Add(path + "  (" + pis.Count + " pages)");
-                            }
-                            else
-                            {
-                                foreach (var kv in pis)
-                                {
-                                    try
+                                    LayoutManager.Current.CurrentLayout = name; // switch with nothing open, then read the layout
+                                    using (var tr = db.TransactionManager.StartTransaction())
                                     {
-                                        try { LayoutManager.Current.CurrentLayout = kv.Key; } catch { }
-                                        string path = ch.Pdf ? PlotNaming.Unique(ch.Folder, PlotNaming.FileName(ch.Pattern, drawing, kv.Key), ".pdf", File.Exists) : "";
-                                        pe.BeginDocument(kv.Value, doc.Name, null, 1, ch.Pdf, path);
-                                        var pp = new PlotPageInfo(); pe.BeginPage(pp, kv.Value, true, null); pe.BeginGenerateGraphics(null); pe.EndGenerateGraphics(null); pe.EndPage(null); pe.EndDocument(null);
-                                        done.Add(ch.Pdf ? path : kv.Key + " (printer)");
+                                        var ld = (DBDictionary)tr.GetObject(db.LayoutDictionaryId, OpenMode.ForRead);
+                                        var lo = (Layout)tr.GetObject(ld.GetAt(name), OpenMode.ForRead); string how; PlotSettings keep;
+                                        var pi = BuildInfo(lo, ch, unit, out how, out keep); keepers.Add(keep); pis.Add(new KeyValuePair<string, PlotInfo>(name, pi));
+                                        tr.Commit();
                                     }
-                                    catch (System.Exception ex) { failed.Add(kv.Key + ": " + ex.Message); try { pe.EndDocument(null); } catch { } }
+                                }
+                                catch (System.Exception ex) { failed.Add(name + ": " + ex.Message); }
+                            }
+                            if (pis.Count > 0)
+                            {
+                                using (var pe = PlotFactory.CreatePublishEngine())
+                                {
+                                    pe.BeginPlot(null, null);
+                                    if (ch.Pdf && ch.Combined)
+                                    {
+                                        string path = PlotNaming.Unique(ch.Folder, PlotNaming.FileName("{drawing}", drawing, ""), ".pdf", File.Exists);
+                                        pe.BeginDocument(pis[0].Value, doc.Name, null, 1, true, path);
+                                        for (int i = 0; i < pis.Count; i++)
+                                        {
+                                            try { LayoutManager.Current.CurrentLayout = pis[i].Key; } catch { }
+                                            var pp = new PlotPageInfo(); pe.BeginPage(pp, pis[i].Value, i == pis.Count - 1, null); pe.BeginGenerateGraphics(null); pe.EndGenerateGraphics(null); pe.EndPage(null);
+                                        }
+                                        pe.EndDocument(null); done.Add(path + "  (" + pis.Count + " pages)");
+                                    }
+                                    else
+                                    {
+                                        foreach (var kv in pis)
+                                        {
+                                            try
+                                            {
+                                                try { LayoutManager.Current.CurrentLayout = kv.Key; } catch { }
+                                                string path = ch.Pdf ? PlotNaming.Unique(ch.Folder, PlotNaming.FileName(ch.Pattern, drawing, kv.Key), ".pdf", File.Exists) : "";
+                                                pe.BeginDocument(kv.Value, doc.Name, null, 1, ch.Pdf, path);
+                                                var pp = new PlotPageInfo(); pe.BeginPage(pp, kv.Value, true, null); pe.BeginGenerateGraphics(null); pe.EndGenerateGraphics(null); pe.EndPage(null); pe.EndDocument(null);
+                                                done.Add(ch.Pdf ? path : kv.Key + " (printer)");
+                                            }
+                                            catch (System.Exception ex) { failed.Add(kv.Key + ": " + ex.Message); try { pe.EndDocument(null); } catch { } }
+                                        }
+                                    }
+                                    pe.EndPlot(null);
                                 }
                             }
-                            pe.EndPlot(null);
                         }
-                        tr.Commit();
+                        finally { foreach (var k in keepers) { try { k.Dispose(); } catch { } } }
                     }
                 }
                 catch (System.Exception ex) { failed.Add("Plot stopped: " + ex.Message); }
