@@ -31,12 +31,13 @@ namespace BPlus.LiveMap
                 var rc = ComponentManager.Ribbon; if (rc == null) return false;
                 foreach (var t in rc.Tabs) if (t.Id == TabId) return true;
                 var tab = new RibbonTab { Title = "B+ CAD Tools", Id = TabId };
-                AddStackPanel(tab, "Points", 3, L("Import\npoints", "BPIMPORT ", "import", "Import a points file (txt, csv, xlsx) as points with codes and layers"), L("Export\npoints", "BPEXPORT ", "export", "Export points to a clean text or csv file"), L("Show / hide", "BPISOLATE ", "layers", "Show or hide point categories"), L("Codes", "BPCODES ", "codes", "Edit the point code rules"), L("Connect\npoints", "BPCONNECT ", "connect", "Draw lines through points by code and point number"), L("Vertices to\npoints", "BPVERTS ", "verts", "Make a numbered point at every vertex"), L("Convert\npoints", "BPCONVPTS ", "convpts", "Convert AutoCAD points to Civil 3D COGO points and back. Needs Civil 3D"), L("QA / QC", "BPQAQC ", "qa", "Check points: repeated numbers, duplicates, missing code or elevation, spikes"), L("Coordinates", "BPCOORD ", "coord", "Write E and N at points and vertices"));
-                AddStackPanel(tab, "Live Map", 3, L("Live map", "BPGMAP ", "map", "Show or hide the live Google map behind the drawing"), L("Map options", "BPMAPOPT ", "gear", "Map type, opacity, refresh, coordinate system and Google key"), L("Coordinate\nsystem", "BPGMAPCS ", "cs", "Choose the coordinate system of the drawing: search by name, EPSG or country"));
-                AddStackPanel(tab, "Edit", 2, L("Lengths", "BPLENGTHS ", "lengths", "List length and area of selected polylines, with table, CSV and labels"), L("Join", "BPJOIN ", "join", "Join lines, polylines and arcs, closing small gaps"), L("Trim", "BPTRIM ", "trim", "Trim to a closed boundary: keep inside or outside"), L("Label", "BPLABEL ", "label", "Write length and area next to the selected polylines"), L("Auto\nleader", "BPLEADER ", "leader", "Select shapes: make a leader from each with its length or area"), L("Shift", "BPSHIFT ", "shift", "Move the selection by dE, dN, dZ"), L("Merge hatch", "BPHATCHMERGE ", "merge", "Combine several hatches into one"), L("Split hatch", "BPHATCHSPLIT ", "split", "Split a hatch into one hatch per separate area"));
-                AddStackPanel(tab, "Measure", 3, L("Area", "BPAREA ", "area", "Area of closed polylines in m2, with perimeter in m"), L("Distance", "BPDIST ", "dist", "Distance, azimuth and bearing between two points"), L("Chain\nlength", "BPCHAIN ", "chain", "Length along many picked points, with each segment"), L("Area by\npoints", "BPAREAPTS ", "areapts", "Area and perimeter of picked corners"), L("Angle", "BPANGLE ", "angle", "Angle between two lines, from three points"), L("Pick\ncoordinates", "BPPICK ", "pickxy", "E, N, Z of picked points, with latitude and longitude when a coordinate system is set"));
-                AddStackPanel(tab, "Quantities / Plot", 3, L("Sinks", "BPSINKS ", "sinks", "Find where water collects on a surface: sinks with E, N, Z, depth, area and volume"), L("Cut and\nfill", "BPCUTFILL ", "cutfill", "Cut and fill volumes (m3) between the ground and another surface, a level or a plane"), L("Plot\nlayouts", "BPPLOT ", "plot", "Plot the layouts you tick: each layout's own page setup or your settings, to PDF or a printer"));
-                AddStackPanel(tab, "Settings", 3, L("Settings", "BPSETTINGS ", "sliders", "Options, point defaults, updates"), L("Check\nupdates", "BPUPDATE ", "update", "Check GitHub for a newer version and install it"), L("About", "BPABOUT ", "about", "Version and where settings are kept"));
+                AddStackPanel(tab, "Points", 3, L("Import points", "BPIMPORT ", "import", "Import a points file (txt, csv, xlsx) as points with codes and layers"), L("Show / hide", "BPISOLATE ", "layers", "Show or hide point categories"), L("Codes", "BPCODES ", "codes", "Edit the point code rules"), L("Connect points", "BPCONNECT ", "connect", "Draw lines through points by code and point number"), L("Vertices to points", "BPVERTS ", "verts", "Make a numbered point at every vertex"), L("Convert points", "BPCONVPTS ", "convpts", "Convert AutoCAD points to Civil 3D COGO points and back. Needs Civil 3D"), L("QA / QC", "BPQAQC ", "qa", "Check points: repeated numbers, duplicates, missing code or elevation, spikes"), L("Shift", "BPSHIFT ", "shift", "Move the selection by dE, dN, dZ"));
+                AddStackPanel(tab, "Live Map", 3, L("Live map", "BPGMAP ", "map", "Show or hide the live Google map behind the drawing"), L("Map options", "BPMAPOPT ", "gear", "Map type, opacity, refresh, coordinate system and Google key"), L("Coordinate system", "BPGMAPCS ", "cs", "Choose the coordinate system of the drawing: search by name, EPSG or country"));
+                AddStackPanel(tab, "Edit", 3, L("Join", "BPJOIN ", "join", "Join lines, polylines and arcs, closing small gaps"), L("Trim", "BPTRIM ", "trim", "Trim to a closed boundary: keep inside or outside"), L("Label", "BPLABEL ", "label", "Write length and area next to the selected polylines"), L("Auto leader", "BPLEADER ", "leader", "Select shapes: make a leader from each with its length or area"), L("Merge hatch", "BPHATCHMERGE ", "merge", "Combine several hatches into one"), L("Split hatch", "BPHATCHSPLIT ", "split", "Split a hatch into one hatch per separate area"));
+                AddStackPanel(tab, "Measure", 3, L("Area", "BPAREA ", "area", "Area of closed polylines in m2, with perimeter in m"), L("Distance", "BPDIST ", "dist", "Distance, azimuth and bearing between two points"), L("Chain length", "BPCHAIN ", "chain", "Length along many picked points, with each segment"), L("Area by points", "BPAREAPTS ", "areapts", "Area and perimeter of picked corners"), L("Angle", "BPANGLE ", "angle", "Angle between two lines, from three points"), L("Pick coordinates", "BPPICK ", "pickxy", "E, N, Z of picked points, with latitude and longitude when a coordinate system is set"));
+                AddStackPanel(tab, "Quantities", 3, L("Sinks", "BPSINKS ", "sinks", "Find where water collects on a surface: sinks with E, N, Z, depth, area and volume"), L("Cut and fill", "BPCUTFILL ", "cutfill", "Cut and fill volumes (m3) between the ground and another surface, a level or a plane"), L("Lengths", "BPLENGTHS ", "lengths", "List length and area of selected polylines, with table, CSV and labels"));
+                AddStackPanel(tab, "Output", 3, L("Plot layouts", "BPPLOT ", "plot", "Plot the layouts you tick: each layout's own page setup or your settings, to PDF or a printer"), L("Export points", "BPEXPORT ", "export", "Export points to a clean text or csv file"), L("Coordinates", "BPCOORD ", "coord", "Write E and N at points and vertices"));
+                AddStackPanel(tab, "Settings", 3, L("Settings", "BPSETTINGS ", "sliders", "Options, point defaults, updates"), L("Check updates", "BPUPDATE ", "update", "Check GitHub for a newer version and install it"), L("About", "BPABOUT ", "about", "Version and where settings are kept"));
                 rc.Tabs.Add(tab);
                 Log.Write("Ribbon tab added.");
                 return true;
@@ -56,7 +57,7 @@ namespace BPlus.LiveMap
             for (int r = 0; r < rows; r++)
             {
                 bool any = false;
-                for (int i = r; i < btns.Length; i += rows) { rp.Items.Add(Small(btns[i])); any = true; }
+                for (int i = r; i < btns.Length; i += rows) { var sb = Small(btns[i]); int mx = 0; for (int j = i - r; j < Math.Min(btns.Length, i - r + rows); j++) mx = Math.Max(mx, btns[j][0].Replace("\n", " ").Length); sb.Width = Math.Max(70, mx * 6.6 + 34); rp.Items.Add(sb); any = true; }
                 if (any && r < rows - 1 && r + 1 < btns.Length) rp.Items.Add(new RibbonRowBreak());
             }
             src.Items.Add(rp);
@@ -101,7 +102,27 @@ namespace BPlus.LiveMap
             }
         }
 
+        /// <summary>Every icon is redrawn big, trimmed to its drawing, and scaled to the same box and centred, so all icons have the same size and position.</summary>
         static BitmapSource Icon(int size, string kind)
+        {
+            using (var big = DrawIcon(128, kind))
+            {
+                int x0 = big.Width, y0 = big.Height, x1 = -1, y1 = -1;
+                for (int y = 0; y < big.Height; y++) for (int x = 0; x < big.Width; x++) if (big.GetPixel(x, y).A > 24) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+                if (x1 < 0) { x0 = 0; y0 = 0; x1 = big.Width - 1; y1 = big.Height - 1; }
+                int w = x1 - x0 + 1, h = y1 - y0 + 1; float box = Math.Max(w, h), target = size - (size >= 32 ? 4 : 2), sc = target / box;
+                using (var bmp = new Bitmap(size, size, System.Drawing.Imaging.PixelFormat.Format32bppArgb))
+                using (var g = Graphics.FromImage(bmp))
+                {
+                    g.Clear(Color.Transparent); g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic; g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality; g.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
+                    float dw = w * sc, dh = h * sc; g.DrawImage(big, new RectangleF((size - dw) / 2f, (size - dh) / 2f, dw, dh), new RectangleF(x0, y0, w, h), GraphicsUnit.Pixel);
+                    var ms = new MemoryStream(); bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png); ms.Position = 0;
+                    var bi = new BitmapImage(); bi.BeginInit(); bi.StreamSource = ms; bi.CacheOption = BitmapCacheOption.OnLoad; bi.EndInit(); bi.Freeze(); return bi;
+                }
+            }
+        }
+
+        static Bitmap DrawIcon(int size, string kind)
         {
             using (var bmp = new Bitmap(size, size, System.Drawing.Imaging.PixelFormat.Format32bppArgb))
             using (var g = Graphics.FromImage(bmp))
@@ -268,8 +289,7 @@ namespace BPlus.LiveMap
                     g.DrawEllipse(white, 10 * s, 10 * s, 12 * s, 12 * s);
                     for (int i = 0; i < 8; i++) { double a = i * Math.PI / 4; g.DrawLine(white, (float)(16 * s + Math.Cos(a) * 8 * s), (float)(16 * s + Math.Sin(a) * 8 * s), (float)(16 * s + Math.Cos(a) * 12 * s), (float)(16 * s + Math.Sin(a) * 12 * s)); }
                 }
-                var ms = new MemoryStream(); bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png); ms.Position = 0;
-                var bi = new BitmapImage(); bi.BeginInit(); bi.StreamSource = ms; bi.CacheOption = BitmapCacheOption.OnLoad; bi.EndInit(); bi.Freeze(); return bi;
+                return (Bitmap)bmp.Clone();
             }
         }
     }
