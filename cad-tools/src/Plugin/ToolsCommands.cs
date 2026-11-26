@@ -438,19 +438,34 @@ namespace BPlus.LiveMap
             Guard("BPLEADER", () =>
             {
                 var doc = Doc; var ed = doc.Editor;
-                var psr = ed.GetSelection(new PromptSelectionOptions { MessageForAdding = "\nSelect shapes to label with leaders" }, new SelectionFilter(new[] { new TypedValue((int)DxfCode.Start, CrvFilter) }));
+                var psr = ed.GetSelection(new PromptSelectionOptions { MessageForAdding = "\nSelect shapes to label with leaders" }, new SelectionFilter(new[] { new TypedValue((int)DxfCode.Start, CrvFilter + ",POINT") }));
                 if (psr.Status != PromptStatus.OK) return;
-                var ids = psr.Value.GetObjectIds(); var rows = LenRows(doc, ids);
-                if (rows.Count == 0) { ed.WriteMessage("\n[B+] Nothing measurable was selected.\n"); return; }
-                var ch = ToolsUi.Leader(rows.Count, rows.Count(r => r.Closed)); if (ch == null) return;
+                var allIds = psr.Value.GetObjectIds();
+                var ptIds = allIds.Where(i => i.ObjectClass.DxfName == "POINT").ToArray(); var ids = allIds.Where(i => i.ObjectClass.DxfName != "POINT").ToArray();
+                var rows = LenRows(doc, ids);
+                if (rows.Count == 0 && ptIds.Length == 0) { ed.WriteMessage("\n[B+] Nothing measurable was selected.\n"); return; }
+                var ch = ToolsUi.Leader(rows.Count, rows.Count(r => r.Closed), ptIds.Length); if (ch == null) return;
                 int made = 0, skipped = 0; double th = ch.TextH; string fmt = "F" + ch.Decimals; var inv = CultureInfo.InvariantCulture;
                 using (doc.LockDocument())
                 using (var tr = doc.Database.TransactionManager.StartTransaction())
                 {
                     var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(doc.Database), OpenMode.ForWrite);
                     var lay = SurveyCad.EnsureLayer(tr, doc.Database, "BP-LEADER", 7);
+                    foreach (var pid in ptIds)
+                    {
+                        var dp = (DBPoint)tr.GetObject(pid, OpenMode.ForRead); var pp = dp.Position;
+                        if (ch.What == "len" || ch.What == "area" || ch.What == "both") { skipped++; continue; }
+                        string ptext = "E " + pp.X.ToString(fmt, inv) + "\\PN " + pp.Y.ToString(fmt, inv) + (ch.Z ? "\\PZ " + pp.Z.ToString(fmt, inv) : "");
+                        var pend = new Point3d(pp.X + th * 3, pp.Y + th * 3, pp.Z);
+                        var pml = new MLeader(); pml.SetDatabaseDefaults(doc.Database); pml.ContentType = ContentType.MTextContent;
+                        var pmt = new MText { Contents = ptext, TextHeight = th }; pmt.SetDatabaseDefaults(doc.Database); pml.MText = pmt;
+                        int pli = pml.AddLeader(); int pln = pml.AddLeaderLine(pli); pml.AddFirstVertex(pln, pp); pml.AddLastVertex(pln, pend);
+                        pml.TextHeight = th; pml.ArrowSize = ch.Arrow ? th * 0.8 : 0.0; pml.LayerId = lay;
+                        ms.AppendEntity(pml); tr.AddNewlyCreatedDBObject(pml, true); made++;
+                    }
                     foreach (var r in rows)
                     {
+                        if (ch.What == "coord") { skipped++; continue; }
                         var c = (Curve)tr.GetObject((ObjectId)r.Tag, OpenMode.ForRead);
                         string text; string lt = r.Len.ToString(fmt, inv) + " m", at = r.Area.ToString(fmt, inv) + " m\u00B2";
                         if (ch.What == "len") text = lt;

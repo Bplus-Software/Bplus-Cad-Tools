@@ -69,9 +69,9 @@ namespace BPlus.LiveMap
                 var c3 = Chk("Blocks (kept whole if the insertion point is on the kept side)", 16, 202, 540, true);
                 f.Controls.AddRange(new Control[] { c1, c2, c3 });
                 f.Controls.Add(Theme.Lbl("Hatches are not trimmed in this version: they stay as they are.", 16, 232, 540, true));
-                var keepR = Chk("Keep the trimmed-away parts on layer BP-TRIMMED (switched off) instead of deleting", 16, 262, 550, false); f.Controls.Add(keepR);
-                f.Controls.Add(Theme.Lbl("Objects completely on the removed side are removed. Objects crossing the boundary are cut at it.", 16, 296, 550, true));
-                f.Controls.Add(Theme.Lbl("The boundary itself is not changed. One UNDO reverses everything.", 16, 318, 550, true));
+                var keepR = Chk("Keep the trimmed-away parts on layer BP-TRIMMED (switched off) instead of deleting", 16, 262, 550, true); f.Controls.Add(keepR);
+                f.Controls.Add(Theme.Lbl("Keep inside: only objects that cross the boundary are cut. Nothing outside is touched.", 16, 296, 550, true));
+                f.Controls.Add(Theme.Lbl("Keep outside: objects inside are removed, crossing ones are cut. The boundary itself is not changed. One UNDO.", 16, 318, 550, true));
                 var res = new Label { Left = 16, Top = 350, Width = 548, Height = 30, ForeColor = Color.FromArgb(120, 210, 140), BackColor = Color.Transparent, Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
                 f.Controls.Add(res);
                 Func<TrimChoice> read = () => new TrimChoice { KeepInside = k1.Checked, Curves = c1.Checked, Points = c2.Checked, Blocks = c3.Checked, KeepRemoved = keepR.Checked };

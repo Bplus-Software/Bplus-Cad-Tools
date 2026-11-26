@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
@@ -54,6 +55,25 @@ namespace BPlus.LiveMap
             try { var d = AcApp.DocumentManager.MdiActiveDocument; if (d != null && Pending.Length > 0) d.Editor.WriteMessage("\n[B+] " + Pending + "\n"); } catch { }
         }
 
+        // Unsaved drawings (DBMOD) and the saved drawings to open again. Needs the Session flag to switch documents.
+        static bool CheckDrawings(out List<string> unsaved, out List<string> saved)
+        {
+            unsaved = new List<string>(); saved = new List<string>();
+            var dm = AcApp.DocumentManager; var cur = dm.MdiActiveDocument;
+            var docs = new List<Document>(); foreach (Document d in dm) docs.Add(d);
+            foreach (var d in docs)
+            {
+                string name = d.Name; bool known = false; long mod = 0;
+                try { if (dm.MdiActiveDocument != d) dm.MdiActiveDocument = d; if (dm.MdiActiveDocument == d) { mod = Convert.ToInt64(AcApp.GetSystemVariable("DBMOD")); known = true; } } catch (Exception e) { Log.Write("DBMOD check: " + e.Message); }
+                bool onDisk = Path.IsPathRooted(name) && File.Exists(name);
+                if (!known) unsaved.Add(Path.GetFileName(name) + " (could not check: save it to be safe)");
+                else if (mod != 0) unsaved.Add(Path.GetFileName(name));
+                if (onDisk && name.EndsWith(".dwg", StringComparison.OrdinalIgnoreCase)) saved.Add(name);
+            }
+            try { if (cur != null && dm.MdiActiveDocument != cur) dm.MdiActiveDocument = cur; } catch { }
+            return unsaved.Count == 0;
+        }
+
         public static void Manual()
         {
             UpdateInfo u;
@@ -76,9 +96,24 @@ namespace BPlus.LiveMap
             }
             catch (Exception e) { Log.Write("Update download: " + e); MessageBox.Show("Update failed: " + Short(e), "B+ CAD Tools", MessageBoxButtons.OK, MessageBoxIcon.Error); return; }
             Log.Write("Update " + u.Version + " downloaded and verified: " + exe);
+            List<string> unsaved, saved;
+            if (!CheckDrawings(out unsaved, out saved))
+            {
+                MessageBox.Show("The update was NOT started: these drawings have unsaved changes.\n\n  " + string.Join("\n  ", unsaved) + "\n\nSave them (QSAVE), then run BPUPDATE again. The update closes AutoCAD, and unsaved work would be lost.", "B+ CAD Tools", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                Log.Write("Update refused, unsaved: " + string.Join("; ", unsaved)); return;
+            }
             var go = MessageBox.Show("Version " + u.Version + " is downloaded and its SHA-256 matches.\n\nInstall now? AutoCAD will close the normal way: it asks you to save any unsaved drawing, nothing is forced. The installer then finishes by itself and offers to open AutoCAD again.\n\nWindows SmartScreen may warn because the installer is not code-signed.", "B+ CAD Tools update", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
             if (go != DialogResult.Yes) { Log.Write("Update installer kept for later: " + exe); return; }
-            try { Process.Start(new ProcessStartInfo(exe, "/CONFIRMED") { UseShellExecute = true }); } catch (Exception e) { MessageBox.Show("Could not start the installer: " + e.Message + "\nIt is saved at " + exe, "B+ CAD Tools", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+            if (!CheckDrawings(out unsaved, out saved)) { MessageBox.Show("The update was NOT started: a drawing was changed. Unsaved: " + string.Join(", ", unsaved) + ".\nSave it (QSAVE), then run BPUPDATE again.", "B+ CAD Tools", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+            string args = "/CONFIRMED";
+            try
+            {
+                var lines = new List<string>(); try { lines.Add(Process.GetCurrentProcess().MainModule.FileName); } catch { lines.Add(""); }
+                lines.AddRange(saved); string lf = Path.Combine(dir, "reopen.txt"); File.WriteAllLines(lf, lines.ToArray()); args += " /DRAWINGS \"" + lf + "\"";
+                Log.Write("Reopen list written with " + saved.Count + " drawing(s).");
+            }
+            catch (Exception e) { Log.Write("Reopen list failed: " + e.Message); }
+            try { Process.Start(new ProcessStartInfo(exe, args) { UseShellExecute = true }); } catch (Exception e) { MessageBox.Show("Could not start the installer: " + e.Message + "\nIt is saved at " + exe, "B+ CAD Tools", MessageBoxButtons.OK, MessageBoxIcon.Error); }
         }
         static string Short(Exception e) { while (e.InnerException != null) e = e.InnerException; return e.Message; }
     }
@@ -105,7 +140,7 @@ namespace BPlus.LiveMap
                 var ok = Theme.Btn("Save", 324, 396, 85, true); var cancel = Theme.Btn("Cancel", 417, 396, 85);
                 codes.Click += (s, e) => { var t = SurveyUi.Codes(SurveyCad.RulesText()); if (t != null) SurveyCad.SaveRulesText(t); };
                 map.Click += (s, e) => SettingsDialog.Show();
-                upd.Click += (s, e) => UpdateCheck.Manual();
+                upd.Click += (s, e) => { try { var dd = AcApp.DocumentManager.MdiActiveDocument; f.DialogResult = DialogResult.Cancel; if (dd != null) dd.SendStringToExecute("BPUPDATE ", true, false, false); } catch { } };
                 rel.Click += (s, e) => { try { Process.Start(new ProcessStartInfo("https://github.com/Bplus-Software/Bplus-Cad-Tools/releases") { UseShellExecute = true }); } catch { } };
                 logb.Click += (s, e) => { try { Process.Start(new ProcessStartInfo(Paths.Dir) { UseShellExecute = true }); } catch { } };
                 ok.Click += (s, e) =>

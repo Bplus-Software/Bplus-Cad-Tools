@@ -109,13 +109,14 @@ namespace BPlus.LiveMap
                     {
                         bool inn = Inside(poly, MidOf(c));
                         if (inn == o.KeepInside) return "whole";
+                        if (o.KeepInside) return "whole"; // wholly outside the polygon: never touched
                         if (apply) { var w = (Entity)tr.GetObject(id, OpenMode.ForWrite); if (o.KeepRemoved) w.LayerId = trimLay; else w.Erase(); }
                         return "deleted";
                     }
                     var pieces = c.GetSplitCurves(new DoubleCollection(u.ToArray()));
                     var keep = new List<Curve>(); var drop = new List<Curve>();
                     foreach (DBObject d in pieces) { var pc = (Curve)d; try { (Inside(poly, MidOf(pc)) == o.KeepInside ? keep : drop).Add(pc); } catch { drop.Add(pc); } }
-                    string outcome = drop.Count == 0 ? "whole" : keep.Count == 0 ? "deleted" : "cut";
+                    string outcome = drop.Count == 0 ? "whole" : keep.Count == 0 ? (o.KeepInside ? "whole" : "deleted") : "cut";
                     if (!apply || outcome == "whole") { foreach (DBObject d in pieces) d.Dispose(); return outcome; }
                     var orig = (Entity)tr.GetObject(id, OpenMode.ForWrite);
                     foreach (var k in keep) { k.SetPropertiesFrom(orig); ms.AppendEntity(k); tr.AddNewlyCreatedDBObject(k, true); }
@@ -129,6 +130,7 @@ namespace BPlus.LiveMap
                 if (e is DBPoint) at = ((DBPoint)e).Position; else if (e is DBText) at = ((DBText)e).Position; else if (e is MText) at = ((MText)e).Location; else if (isBlk) at = ((BlockReference)e).Position;
                 if (at == null || (isPt && !o.Points) || (isBlk && !o.Blocks)) return "skip";
                 if (Inside(poly, at.Value) == o.KeepInside) return "whole";
+                if (o.KeepInside) return "whole"; // outside the polygon: never touched
                 if (apply) { var w = (Entity)tr.GetObject(id, OpenMode.ForWrite); if (o.KeepRemoved) w.LayerId = trimLay; else w.Erase(); }
                 return "deleted";
             }
@@ -167,11 +169,11 @@ namespace BPlus.LiveMap
                 var doc = Doc; var ed = doc.Editor;
                 var peo = new PromptEntityOptions("\nPick the closed polyline to use as the boundary: "); peo.SetRejectMessage("\nOnly a polyline can be the boundary."); peo.AddAllowedClass(typeof(AcPoly), true);
                 var per = ed.GetEntity(peo); if (per.Status != PromptStatus.OK) return;
-                double area; using (var tr = doc.Database.TransactionManager.StartTransaction()) { var b = (AcPoly)tr.GetObject(per.ObjectId, OpenMode.ForRead); if (!b.Closed) { ed.WriteMessage("\n[B+] The boundary must be a closed polyline.\n"); return; } area = b.Area; tr.Commit(); }
-                var psr = ed.GetSelection(new PromptSelectionOptions { MessageForAdding = "\nSelect objects to trim (Enter = everything in the drawing)" });
+                double area; Extents3d bx; using (var tr = doc.Database.TransactionManager.StartTransaction()) { var b = (AcPoly)tr.GetObject(per.ObjectId, OpenMode.ForRead); if (!b.Closed) { ed.WriteMessage("\n[B+] The boundary must be a closed polyline.\n"); return; } area = b.Area; bx = b.GeometricExtents; tr.Commit(); }
+                var psr = ed.GetSelection(new PromptSelectionOptions { MessageForAdding = "\nSelect objects to trim (Enter = only the objects crossing or inside the polygon's area)" });
                 ObjectId[] ids;
                 if (psr.Status == PromptStatus.OK) ids = psr.Value.GetObjectIds();
-                else if (psr.Status == PromptStatus.Error) { var all = ed.SelectAll(); if (all.Status != PromptStatus.OK) return; ids = all.Value.GetObjectIds(); }
+                else if (psr.Status == PromptStatus.Error) { var all = ed.SelectCrossingWindow(bx.MinPoint, bx.MaxPoint); if (all.Status != PromptStatus.OK) { ed.WriteMessage("\n[B+] No objects in the polygon's area.\n"); return; } ids = all.Value.GetObjectIds(); }
                 else return;
                 ids = ids.Where(i => i != per.ObjectId).ToArray();
                 Func<TrimChoice, string> prev = o => { var c = TrimAll(doc, ids, per.ObjectId, o, false); return c.Cut + " cut, " + c.Deleted + " removed, " + c.Whole + " untouched, " + c.Skipped + " skipped (" + ids.Length + " objects)"; };

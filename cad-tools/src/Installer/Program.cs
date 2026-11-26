@@ -12,7 +12,7 @@ namespace BPlus.LiveMap.Setup
         static string LogPath { get { string d = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "BPlus", "LiveMap"); Directory.CreateDirectory(d); return Path.Combine(d, "install-log.txt"); } }
         static void Log(string m) { try { File.AppendAllText(LogPath, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "  " + m + Environment.NewLine); } catch { } }
 
-        const string Version = "0.4.2";
+        const string Version = "0.4.3";
 
         sealed class WaitForm : Form
         {
@@ -89,6 +89,18 @@ namespace BPlus.LiveMap.Setup
                     if (r != DialogResult.OK) return 1;
                 }
                 var reopen = new System.Collections.Generic.List<string>();
+                var drawings = new System.Collections.Generic.List<string>(); string cadExe = null;
+                try
+                {
+                    int di = Array.FindIndex(args, a => a.Equals("/DRAWINGS", StringComparison.OrdinalIgnoreCase));
+                    if (di >= 0 && di + 1 < args.Length && File.Exists(args[di + 1]))
+                    {
+                        var ls = File.ReadAllLines(args[di + 1]); if (ls.Length > 0 && ls[0].Length > 0 && File.Exists(ls[0])) cadExe = ls[0];
+                        for (int i = 1; i < ls.Length; i++) if (File.Exists(ls[i]) && ls[i].EndsWith(".dwg", StringComparison.OrdinalIgnoreCase)) drawings.Add(ls[i]);
+                        Log("Drawings to reopen: " + drawings.Count);
+                    }
+                }
+                catch (Exception e) { Log("Reopen list: " + e.Message); }
                 if (!silent) { if (confirmed) System.Threading.Thread.Sleep(1500); if (!CloseCad(reopen)) { Log("Cancelled while waiting for AutoCAD to close."); return 1; } }
                 Log("Install started. Installer " + Assembly.GetExecutingAssembly().GetName().Version + ", OS " + Environment.OSVersion);
                 InstallLogic.RemoveLegacy(InstallLogic.LegacyTarget(), Log);
@@ -127,8 +139,8 @@ namespace BPlus.LiveMap.Setup
                 {
                     if (reopen.Count > 0)
                     {
-                        if (MessageBox.Show("Installed " + Version + ".\n\nOpen AutoCAD again now? (Your earlier drawings are not reopened.)\nYou will see a B+ CAD Tools tab. Type BPCHECK to check the install.", "B+ CAD Tools", MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes)
-                            foreach (var exe in reopen) { try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(exe) { UseShellExecute = true }); } catch (Exception ex) { Log("Reopen failed: " + ex.Message); } }
+                        if (MessageBox.Show("Installed " + Version + ".\n\nOpen AutoCAD again now?" + (drawings.Count > 0 ? " Your " + drawings.Count + " saved drawing(s) will be opened again." : " (Your earlier drawings are not reopened.)") + "\n\nYou will see a B+ CAD Tools tab. Type BPCHECK to check the install.", "B+ CAD Tools", MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes)
+                            foreach (var exe in reopen) { try { string a = (cadExe != null && string.Equals(exe, cadExe, StringComparison.OrdinalIgnoreCase)) ? string.Join(" ", drawings.ConvertAll(d => "\"" + d + "\"").ToArray()) : ""; System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(exe, a) { UseShellExecute = true }); } catch (Exception ex) { Log("Reopen failed: " + ex.Message); } }
                     }
                     else MessageBox.Show("Installed " + Version + ".\n\nRestart AutoCAD or Civil 3D. You will see a B+ CAD Tools tab. Type BPCHECK to check the install.\nInstall log: " + LogPath, "B+ CAD Tools", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }

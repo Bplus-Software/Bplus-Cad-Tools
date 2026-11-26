@@ -242,7 +242,7 @@ namespace BPlus.LiveMap
     public partial class Commands
     {
         [CommandMethod("BPSETTINGS")] public static void GeneralSet() { Guard("BPSETTINGS", GeneralSettings.Show); }
-        [CommandMethod("BPUPDATE")] public static void Update() { Guard("BPUPDATE", UpdateCheck.Manual); }
+        [CommandMethod("BPUPDATE", CommandFlags.Session)] public static void Update() { Guard("BPUPDATE", UpdateCheck.Manual); }
         [CommandMethod("BPABOUT")]
         public static void About()
         {

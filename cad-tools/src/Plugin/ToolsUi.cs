@@ -83,29 +83,32 @@ namespace BPlus.LiveMap
             action = act; row = sel;
         }
 
-        public sealed class LeaderChoice { public string What = "auto"; public bool Centre; public double TextH = 1; public int Decimals = 2; public bool Arrow = true; }
-        public static LeaderChoice Leader(int total, int closed)
+        public sealed class LeaderChoice { public string What = "auto"; public bool Centre; public double TextH = 1; public int Decimals = 2; public bool Arrow = true; public bool Z; }
+        public static LeaderChoice Leader(int total, int closed, int points)
         {
-            using (var f = Theme.Base("B+ CAD Tools - Auto leaders", 460, 440))
+            using (var f = Theme.Base("B+ CAD Tools - Auto leaders", 460, 500))
             {
                 var c = new LeaderChoice { TextH = Config.TextHeight };
-                f.Controls.Add(Theme.Lbl(total + " shapes selected (" + closed + " closed, " + (total - closed) + " open).", 16, 12, 420));
+                f.Controls.Add(Theme.Lbl(points + " point(s), " + total + " shape(s) (" + closed + " closed, " + (total - closed) + " open).", 16, 12, 420));
                 f.Controls.Add(Theme.Lbl("Put on the leader", 16, 44, 300));
-                string[] names = { "Length (m)", "Area (m\u00B2), closed shapes only", "Length and area, two lines", "Automatic: area for closed, length for open" };
-                var rb = new RadioButton[4];
-                for (int i = 0; i < 4; i++) { rb[i] = new RadioButton { Left = 16, Top = 70 + i * 26, Width = 420, Text = names[i], ForeColor = Theme.Text, BackColor = Color.Transparent, Checked = i == 3 }; f.Controls.Add(rb[i]); }
-                f.Controls.Add(Theme.Lbl("Leader starts at", 16, 184, 200));
-                var st = new ComboBox { Left = 16, Top = 208, Width = 260, DropDownStyle = ComboBoxStyle.DropDownList, FlatStyle = FlatStyle.Flat }; Theme.Style(st); st.Items.AddRange(new object[] { "Middle of the shape's length", "Centre of the shape (closed ones)" }); st.SelectedIndex = 0;
-                f.Controls.Add(Theme.Lbl("Text height", 16, 246, 100)); var th = new TextBox { Left = 16, Top = 268, Width = 80, BorderStyle = BorderStyle.FixedSingle, Text = c.TextH.ToString(CultureInfo.InvariantCulture) }; Theme.Style(th);
-                f.Controls.Add(Theme.Lbl("Decimals", 120, 246, 80)); var dec = new NumericUpDown { Left = 120, Top = 268, Width = 60, Minimum = 0, Maximum = 6, Value = 2 }; Theme.Style(dec);
-                var arrow = new CheckBox { Left = 210, Top = 268, Width = 220, Text = "Arrow head at the shape", Checked = true, ForeColor = Theme.Text, BackColor = Color.Transparent };
-                f.Controls.Add(Theme.Lbl("Each leader goes up and right by 3 x the text height, on layer BP-LEADER.", 16, 312, 430, true));
-                f.Controls.Add(Theme.Lbl("Dense drawings: leaders may overlap, move them after. One UNDO removes all.", 16, 334, 430, true));
-                var ok = Theme.Btn("Create", 262, 396, 90, true); var cancel = Theme.Btn("Cancel", 360, 396, 90);
+                string[] names = { "Length (m)  (shapes)", "Area (m\u00B2), closed shapes only", "Length and area, two lines", "Automatic: points = coordinates, closed = area, open = length", "Coordinates (E, N)  (points)" };
+                var rb = new RadioButton[5];
+                for (int i = 0; i < 5; i++) { rb[i] = new RadioButton { Left = 16, Top = 70 + i * 26, Width = 430, Text = names[i], ForeColor = Theme.Text, BackColor = Color.Transparent, Checked = i == 3 }; f.Controls.Add(rb[i]); }
+                var z = new CheckBox { Left = 40, Top = 202, Width = 300, Text = "Add Z (elevation)", ForeColor = Theme.Text, BackColor = Color.Transparent }; f.Controls.Add(z);
+                f.Controls.Add(Theme.Lbl("Example on a point:   E 500123.450 / N 2700456.120", 16, 236, 430, true));
+                f.Controls.Add(Theme.Lbl("Leader starts at", 16, 268, 200));
+                var st = new ComboBox { Left = 16, Top = 292, Width = 260, DropDownStyle = ComboBoxStyle.DropDownList, FlatStyle = FlatStyle.Flat }; Theme.Style(st); st.Items.AddRange(new object[] { "Middle of the shape's length", "Centre of the shape (closed ones)" }); st.SelectedIndex = 0;
+                f.Controls.Add(Theme.Lbl("Text height", 16, 330, 100)); var th = new TextBox { Left = 16, Top = 352, Width = 80, BorderStyle = BorderStyle.FixedSingle, Text = c.TextH.ToString(CultureInfo.InvariantCulture) }; Theme.Style(th);
+                f.Controls.Add(Theme.Lbl("Decimals", 120, 330, 80)); var dec = new NumericUpDown { Left = 120, Top = 352, Width = 60, Minimum = 0, Maximum = 6, Value = 2 }; Theme.Style(dec);
+                rb[4].CheckedChanged += (s, e) => { if (rb[4].Checked) dec.Value = 3; };
+                var arrow = new CheckBox { Left = 210, Top = 352, Width = 220, Text = "Arrow head at the shape", Checked = true, ForeColor = Theme.Text, BackColor = Color.Transparent };
+                f.Controls.Add(Theme.Lbl("Points: the leader starts at the point. Shapes ignore the coordinate choice.", 16, 396, 430, true));
+                f.Controls.Add(Theme.Lbl("Each leader goes up and right by 3 x the text height, on layer BP-LEADER. One UNDO.", 16, 418, 430, true));
+                var ok = Theme.Btn("Create", 262, 456, 90, true); var cancel = Theme.Btn("Cancel", 360, 456, 90);
                 ok.Click += (s, e) =>
                 {
                     double h; if (!double.TryParse(th.Text.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out h) || h <= 0) { MessageBox.Show(f, "Text height must be a number above zero.", "B+ CAD Tools"); return; }
-                    c.TextH = h; c.Decimals = (int)dec.Value; c.Arrow = arrow.Checked; c.Centre = st.SelectedIndex == 1; c.What = rb[0].Checked ? "len" : rb[1].Checked ? "area" : rb[2].Checked ? "both" : "auto"; f.DialogResult = DialogResult.OK;
+                    c.TextH = h; c.Decimals = (int)dec.Value; c.Arrow = arrow.Checked; c.Centre = st.SelectedIndex == 1; c.Z = z.Checked; c.What = rb[0].Checked ? "len" : rb[1].Checked ? "area" : rb[2].Checked ? "both" : rb[4].Checked ? "coord" : "auto"; f.DialogResult = DialogResult.OK;
                 };
                 cancel.Click += (s, e) => f.DialogResult = DialogResult.Cancel;
                 f.Controls.AddRange(new Control[] { st, th, dec, arrow, ok, cancel }); f.AcceptButton = ok; f.CancelButton = cancel;
