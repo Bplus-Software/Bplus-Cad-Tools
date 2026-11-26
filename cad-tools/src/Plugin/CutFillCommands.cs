@@ -16,6 +16,12 @@ namespace BPlus.LiveMap
     {
         sealed class Elev { public Func<double, double, double> Z; public bool HasBounds; public double MinX, MinY, MaxX, MaxY; public string Note; }
 
+        static string SurfaceName(Document doc, ObjectId id)
+        {
+            try { using (var t = doc.Database.TransactionManager.StartTransaction()) { var o = t.GetObject(id, OpenMode.ForRead); var p = o.GetType().GetProperty("Name"); var n = p == null ? null : p.GetValue(o, null) as string; t.Commit(); if (!string.IsNullOrEmpty(n)) return n; } } catch { }
+            return "surface";
+        }
+
         static bool IsSurface(ObjectId id) { return (id.ObjectClass.DxfName ?? "").IndexOf("SURFACE", StringComparison.OrdinalIgnoreCase) >= 0; }
 
         static Elev CivilElev(Transaction tr, ObjectId id, string name)
@@ -58,42 +64,47 @@ namespace BPlus.LiveMap
         {
             Guard("BPCUTFILL", () =>
             {
-                var doc = Doc; var ed = doc.Editor; var pre = Sel.Peek(ed); var ch = CutFillUi.Ask(); if (ch == null) return;
+                var doc = Doc; var ed = doc.Editor; var pre = Sel.Peek(ed);
                 var inv = CultureInfo.InvariantCulture; var none = new ObjectId[0];
-                CutFillResult res; string info, note; Elev ex, pr = null; double[] cb = null;
+                ObjectId exSurf = ObjectId.Null, cmpSurf = ObjectId.Null, polyId = ObjectId.Null; ObjectId[] exPts = none, cmpPts = none;
+                var status = new Dictionary<string, string>(); int startEx = 0; var ptTypes = new[] { "POINT", "3DFACE", "POLYLINE" };
+                // objects selected before the command fill in the existing ground
+                var preSurf = pre.FirstOrDefault(i => !i.IsNull && IsSurface(i));
+                if (!preSurf.IsNull) { exSurf = preSurf; status["ex_surf"] = SurfaceName(doc, exSurf) + "  (selected)"; }
+                else { var pp0 = pre.Where(i => !i.IsNull && ptTypes.Contains((i.ObjectClass.DxfName ?? "").ToUpperInvariant())).ToArray(); if (pp0.Length > 0) { exPts = pp0; status["ex_pts"] = pp0.Length + " object(s) selected"; startEx = 1; } }
+                Func<string, string> select = key =>
+                {
+                    if (key == "ex_surf" || key == "cmp_surf")
+                    {
+                        var peo = new PromptEntityOptions("\nPick the Civil 3D surface: "); var per = ed.GetEntity(peo); if (per.Status != PromptStatus.OK) return null;
+                        if (!IsSurface(per.ObjectId)) { ed.WriteMessage("\n[B+] That is not a Civil 3D surface. Surfaces exist only in Civil 3D: start Civil 3D (not plain AutoCAD) for this.\n"); return null; }
+                        if (key == "ex_surf") exSurf = per.ObjectId; else cmpSurf = per.ObjectId;
+                        return SurfaceName(doc, per.ObjectId) + "  (selected)";
+                    }
+                    if (key == "poly")
+                    {
+                        var peo = new PromptEntityOptions("\nPick the closed polyline that limits the area: "); peo.SetRejectMessage("\nOnly a polyline."); peo.AddAllowedClass(typeof(AcPoly), true);
+                        var per = ed.GetEntity(peo); if (per.Status != PromptStatus.OK) return null;
+                        using (var tr0 = doc.Database.TransactionManager.StartTransaction()) { var pl0 = (AcPoly)tr0.GetObject(per.ObjectId, OpenMode.ForRead); if (!pl0.Closed) { ed.WriteMessage("\n[B+] The polyline must be closed.\n"); return null; } polyId = per.ObjectId; return "1 polyline (" + pl0.Area.ToString("N1", inv) + " m\u00B2)"; }
+                    }
+                    var psr = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = "\nSelect points, 3D faces and 3D polylines" }, "POINT,3DFACE,POLYLINE", none); if (psr.Status != PromptStatus.OK) return null;
+                    var ids = psr.Value.GetObjectIds(); if (key == "ex_pts") exPts = ids; else cmpPts = ids; return ids.Length + " object(s) selected";
+                };
+                var ch = CutFillUi.Ask(select, status, startEx); if (ch == null) return;
+                CutFillResult res; string info, note; Elev ex, pr = null;
                 using (var tr = doc.Database.TransactionManager.StartTransaction())
                 {
                     // existing ground
                     if (ch.Existing == 0)
                     {
-                        ObjectId sid = pre.FirstOrDefault(i => !i.IsNull && IsSurface(i));
-                        if (sid.IsNull) { var peo = new PromptEntityOptions("\nPick the Civil 3D surface (existing ground): "); var per = ed.GetEntity(peo); if (per.Status != PromptStatus.OK) return; sid = per.ObjectId; if (!IsSurface(sid)) { ed.WriteMessage("\n[B+] That is not a Civil 3D surface.\n"); return; } }
-                        ex = CivilElev(tr, sid, "Existing ground"); if (ex == null) { ed.WriteMessage("\n[B+] This object has no elevation method. Civil 3D is needed for surfaces.\n"); return; }
+                        ex = CivilElev(tr, exSurf, "Existing ground"); if (ex == null) { ed.WriteMessage("\n[B+] This object has no elevation method. Surfaces work only in Civil 3D, not in plain AutoCAD.\n"); return; }
                     }
-                    else
-                    {
-                        var psr = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = "\nSelect points, 3D faces and 3D polylines (existing ground)" }, "POINT,3DFACE,POLYLINE", pre); if (psr.Status != PromptStatus.OK) return;
-                        ex = TrisElev(tr, ed, psr.Value.GetObjectIds(), "Existing ground"); if (ex == null) return;
-                    }
+                    else { ex = TrisElev(tr, ed, exPts, "Existing ground"); if (ex == null) return; }
                     // comparison
                     string what;
-                    if (ch.Proposed == 0)
-                    {
-                        var peo = new PromptEntityOptions("\nPick the second Civil 3D surface, or press Enter to select points / 3D faces: ") { AllowNone = true }; var per = ed.GetEntity(peo);
-                        if (per.Status == PromptStatus.OK)
-                        {
-                            if (!IsSurface(per.ObjectId)) { ed.WriteMessage("\n[B+] That is not a Civil 3D surface.\n"); return; }
-                            pr = CivilElev(tr, per.ObjectId, "Compared with"); if (pr == null) { ed.WriteMessage("\n[B+] No elevation method on that surface.\n"); return; }
-                        }
-                        else if (per.Status == PromptStatus.None)
-                        {
-                            var psr = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = "\nSelect points, 3D faces and 3D polylines (the other surface)" }, "POINT,3DFACE,POLYLINE", none); if (psr.Status != PromptStatus.OK) return;
-                            pr = TrisElev(tr, ed, psr.Value.GetObjectIds(), "Compared with"); if (pr == null) return;
-                        }
-                        else return;
-                        what = "another surface";
-                    }
-                    else if (ch.Proposed == 1) { double lz = ch.Level; pr = new Elev { Z = (x, y) => lz, Note = "Compared with: flat level " + lz.ToString("F3", inv) + " m." }; what = "flat level " + lz.ToString("F3", inv) + " m"; }
+                    if (ch.Proposed == 0) { pr = CivilElev(tr, cmpSurf, "Compared with"); if (pr == null) { ed.WriteMessage("\n[B+] No elevation method on that surface. Surfaces work only in Civil 3D.\n"); return; } what = "another surface"; }
+                    else if (ch.Proposed == 1) { pr = TrisElev(tr, ed, cmpPts, "Compared with"); if (pr == null) return; what = "selected points / faces"; }
+                    else if (ch.Proposed == 2) { double lz = ch.Level; pr = new Elev { Z = (x, y) => lz, Note = "Compared with: flat level " + lz.ToString("F3", inv) + " m." }; what = "flat level " + lz.ToString("F3", inv) + " m"; }
                     else
                     {
                         var p1 = ed.GetPoint("\nPoint on the plane: "); if (p1.Status != PromptStatus.OK) return;
@@ -109,9 +120,7 @@ namespace BPlus.LiveMap
                     if (pr.HasBounds) { minx = Math.Max(minx, pr.MinX); miny = Math.Max(miny, pr.MinY); maxx = Math.Min(maxx, pr.MaxX); maxy = Math.Min(maxy, pr.MaxY); }
                     if (ch.Area == 1)
                     {
-                        var peo = new PromptEntityOptions("\nPick the closed polyline that limits the area: "); peo.SetRejectMessage("\nOnly a polyline."); peo.AddAllowedClass(typeof(AcPoly), true);
-                        var per = ed.GetEntity(peo); if (per.Status != PromptStatus.OK) return;
-                        var pl = (AcPoly)tr.GetObject(per.ObjectId, OpenMode.ForRead); if (!pl.Closed) { ed.WriteMessage("\n[B+] The polyline must be closed.\n"); return; }
+                        var pl = (AcPoly)tr.GetObject(polyId, OpenMode.ForRead); if (!pl.Closed) { ed.WriteMessage("\n[B+] The polyline must be closed.\n"); return; }
                         var poly = new List<double[]>(); int n = pl.NumberOfVertices;
                         for (int i = 0; i < n; i++)
                         {
