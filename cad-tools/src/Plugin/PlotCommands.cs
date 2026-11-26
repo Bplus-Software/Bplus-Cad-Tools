@@ -57,6 +57,8 @@ namespace BPlus.LiveMap
             return "";
         }
 
+        static string SafeCanon(PlotSettings p) { try { return p.CanonicalMediaName; } catch { return null; } }
+
         static string MediaText(PlotSettings src)
         {
             string c = ""; try { c = src.CanonicalMediaName; } catch { }
@@ -110,7 +112,7 @@ namespace BPlus.LiveMap
                 {
                     var ld = (DBDictionary)tr.GetObject(db.LayoutDictionaryId, OpenMode.ForRead); var list = new List<Layout>();
                     foreach (DBDictionaryEntry en in ld) { var lo = (Layout)tr.GetObject(en.Value, OpenMode.ForRead); if (!lo.ModelType) list.Add(lo); }
-                    Log.Write("BPPLOT: reading " + list.Count + " layouts"); foreach (var lo in list.OrderBy(l => l.TabOrder)) rows.Add(new LayoutRow { Name = lo.LayoutName, Setup = string.IsNullOrEmpty(lo.PlotSettingsName) ? "(none)" : lo.PlotSettingsName, Paper = MediaText(lo), Scale = ScaleText(lo, unit) });
+                    Log.Write("BPPLOT: reading " + list.Count + " layouts"); foreach (var lo in list.OrderBy(l => l.TabOrder)) rows.Add(new LayoutRow { Name = lo.LayoutName, Setup = string.IsNullOrEmpty(lo.PlotSettingsName) ? "(none)" : lo.PlotSettingsName, Paper = MediaText(lo), Scale = ScaleText(lo, unit), Canon = SafeCanon(lo) });
                     tr.Commit();
                 }
                 if (rows.Count == 0) { ed.WriteMessage("\n[B+] This drawing has no layouts (only the Model tab).\n"); return; }
