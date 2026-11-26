@@ -76,8 +76,9 @@ namespace BPlus.LiveMap
             }
             catch (Exception e) { Log.Write("Update download: " + e); MessageBox.Show("Update failed: " + Short(e), "B+ CAD Tools", MessageBoxButtons.OK, MessageBoxIcon.Error); return; }
             Log.Write("Update " + u.Version + " downloaded and verified: " + exe);
-            MessageBox.Show("The installer for " + u.Version + " was downloaded and its SHA-256 matches.\n\nClose AutoCAD and Civil 3D first, then press OK here to start the installer. Windows SmartScreen may warn because the installer is not code-signed.", "B+ CAD Tools update", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            try { Process.Start(new ProcessStartInfo(exe) { UseShellExecute = true }); } catch (Exception e) { MessageBox.Show("Could not start the installer: " + e.Message + "\nIt is saved at " + exe, "B+ CAD Tools", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+            var go = MessageBox.Show("Version " + u.Version + " is downloaded and its SHA-256 matches.\n\nInstall now? AutoCAD will close the normal way: it asks you to save any unsaved drawing, nothing is forced. The installer then finishes by itself and offers to open AutoCAD again.\n\nWindows SmartScreen may warn because the installer is not code-signed.", "B+ CAD Tools update", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (go != DialogResult.Yes) { Log.Write("Update installer kept for later: " + exe); return; }
+            try { Process.Start(new ProcessStartInfo(exe, "/CONFIRMED") { UseShellExecute = true }); } catch (Exception e) { MessageBox.Show("Could not start the installer: " + e.Message + "\nIt is saved at " + exe, "B+ CAD Tools", MessageBoxButtons.OK, MessageBoxIcon.Error); }
         }
         static string Short(Exception e) { while (e.InnerException != null) e = e.InnerException; return e.Message; }
     }

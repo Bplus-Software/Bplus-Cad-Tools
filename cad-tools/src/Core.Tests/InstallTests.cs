@@ -53,6 +53,20 @@ public class InstallTests
     }
     [Fact] public void NewBundleNameDiffersFromLegacy() { Assert.Equal("BPlusCadTools.bundle", InstallLogic.BundleName); Assert.EndsWith("BPlusLiveMap.bundle", InstallLogic.LegacyTarget()); }
     static void Install(Stream s, string t) { InstallLogic.Install(s, t, x => { }); }
+    [Fact] public void LockedFolderFallsBackToFileByFile()
+    {
+        var t = Tmp(); Install(Zip(true), t);
+        File.WriteAllText(Path.Combine(t, "Contents", "net48", "a.dll"), "OLD"); File.WriteAllText(Path.Combine(t, "stale.old-bp"), "z");
+        InstallLogic.ForceDirSwapFail = true;
+        try { Install(Zip(true), t); } finally { InstallLogic.ForceDirSwapFail = false; }
+        Assert.Equal("x", File.ReadAllText(Path.Combine(t, "Contents", "net48", "a.dll")));
+        Assert.False(Directory.Exists(t + ".new")); Assert.False(Directory.Exists(t + ".old"));
+    }
+    [Fact] public void LeftoverNewFolderIsCleared()
+    {
+        var t = Tmp(); Directory.CreateDirectory(t + ".new"); File.WriteAllText(Path.Combine(t + ".new", "junk"), "j");
+        Install(Zip(true), t); Assert.True(File.Exists(Path.Combine(t, "Contents", "net48", "a.dll"))); Assert.False(Directory.Exists(t + ".new"));
+    }
 }
 
 public class ProxyClientTests

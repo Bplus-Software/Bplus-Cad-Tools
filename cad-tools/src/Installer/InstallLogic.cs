@@ -5,6 +5,8 @@ using System.Xml;
 
 namespace BPlus.LiveMap.Setup
 {
+    public sealed class LockedException : Exception { public LockedException(string m) : base(m) { } }
+
     public static class InstallLogic
     {
         public const string BundleName = "BPlusCadTools.bundle", LegacyBundleName = "BPlusLiveMap.bundle";
@@ -40,14 +42,27 @@ namespace BPlus.LiveMap.Setup
             }
         }
 
-        // Extracts the zip to a temporary folder, checks it, then swaps it in. The old copy is restored if anything fails.
+        public static bool ForceDirSwapFail; // tests only: pretend the folder is locked
+
+        static void Try(Action a) { try { a(); } catch { } }
+        static void DeleteTree(string d) { if (!Directory.Exists(d)) return; for (int i = 0; i < 3; i++) { try { Directory.Delete(d, true); return; } catch { System.Threading.Thread.Sleep(300); } } }
+
+        // Leftovers of earlier runs: folders ending .new/.old, and renamed locked files (*.old-bp).
+        public static void CleanLeftovers(string target)
+        {
+            DeleteTree(target + ".new"); DeleteTree(target + ".old");
+            if (Directory.Exists(target)) foreach (var f in Directory.GetFiles(target, "*.old-bp", SearchOption.AllDirectories)) Try(() => File.Delete(f));
+        }
+
+        // Extracts the zip to a temporary folder, checks it, then swaps it in. If AutoCAD holds the old folder open the swap is refused;
+        // then every file is replaced in place (a locked DLL is renamed aside, which Windows allows), so the new version loads at the next start.
         public static void Install(Stream zip, string target, Action<string> log)
         {
             string parent = Path.GetDirectoryName(target);
             Directory.CreateDirectory(parent);
             string tmp = target + ".new", old = target + ".old";
-            if (Directory.Exists(tmp)) Directory.Delete(tmp, true);
-            if (Directory.Exists(old)) Directory.Delete(old, true);
+            CleanLeftovers(target);
+            if (Directory.Exists(tmp)) throw new IOException("Cannot clear the leftover folder " + tmp + ". Delete it by hand and run the installer again.");
             log("Unpacking to " + tmp);
             using (var za = new ZipArchive(zip, ZipArchiveMode.Read))
             {
@@ -62,20 +77,39 @@ namespace BPlus.LiveMap.Setup
                 }
             }
             try { Validate(tmp); }
-            catch { Directory.Delete(tmp, true); throw; }
+            catch { DeleteTree(tmp); throw; }
             bool hadOld = Directory.Exists(target);
-            try
+            if (!hadOld) { Directory.Move(tmp, target); log("Installed to " + target); return; }
+            Exception swapErr = null;
+            for (int i = 0; i < 3; i++)
             {
-                if (hadOld) { log("Replacing existing install"); Directory.Move(target, old); }
-                Directory.Move(tmp, target);
-                if (hadOld) { try { Directory.Delete(old, true); } catch (Exception e) { log("Could not delete old copy: " + e.Message); } }
-                log("Installed to " + target);
+                try
+                {
+                    if (ForceDirSwapFail) throw new UnauthorizedAccessException("simulated lock");
+                    Directory.Move(target, old);
+                    try { Directory.Move(tmp, target); }
+                    catch { if (!Directory.Exists(target) && Directory.Exists(old)) Directory.Move(old, target); throw; }
+                    DeleteTree(old); log("Installed to " + target + " (folder swap)"); return;
+                }
+                catch (Exception e) { swapErr = e; log("Folder swap attempt " + (i + 1) + " failed: " + e.Message); System.Threading.Thread.Sleep(700); }
             }
-            catch
+            log("Falling back to file-by-file update because: " + swapErr.Message);
+            string stamp = ".old-bp";
+            foreach (var src in Directory.GetFiles(tmp, "*", SearchOption.AllDirectories))
             {
-                if (hadOld && !Directory.Exists(target) && Directory.Exists(old)) Directory.Move(old, target);
-                throw;
+                string rel = src.Substring(tmp.Length).TrimStart(Path.DirectorySeparatorChar, '/');
+                string dest = Path.Combine(target, rel); Directory.CreateDirectory(Path.GetDirectoryName(dest));
+                try { File.Copy(src, dest, true); continue; } catch (Exception) { }
+                try
+                {
+                    if (File.Exists(dest + stamp)) Try(() => File.Delete(dest + stamp));
+                    string aside = File.Exists(dest + stamp) ? dest + "." + Guid.NewGuid().ToString("N").Substring(0, 6) + stamp : dest + stamp;
+                    File.Move(dest, aside); File.Copy(src, dest, true); log("Replaced locked file " + rel + " (old one renamed aside)");
+                }
+                catch (Exception e2) { throw new LockedException("A file of the installed version is locked: " + rel + " (" + e2.Message + ")"); }
             }
+            DeleteTree(tmp);
+            log("Installed to " + target + " (file-by-file). The new version loads at the next AutoCAD start.");
         }
 
         public static bool Uninstall(string target, Action<string> log)
