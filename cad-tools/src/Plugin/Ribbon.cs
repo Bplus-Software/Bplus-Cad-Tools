@@ -31,14 +31,12 @@ namespace BPlus.LiveMap
                 var rc = ComponentManager.Ribbon; if (rc == null) return false;
                 foreach (var t in rc.Tabs) if (t.Id == TabId) return true;
                 var tab = new RibbonTab { Title = "B+ CAD Tools", Id = TabId };
-                AddPanel(tab, "Points", L("Import\npoints", "BPIMPORT ", "import", "Import a points file (txt, csv, xlsx) as points with codes and layers"), L("Export\npoints", "BPEXPORT ", "export", "Export points to a clean text or csv file"));
-                AddStack(tab.Panels[tab.Panels.Count - 1].Source, 3, L("Show / hide", "BPISOLATE ", "layers", "Show or hide point categories"), L("Codes", "BPCODES ", "codes", "Edit the point code rules"));
-                AddMapPanel(tab, L("Coordinate\nsystem", "BPGMAPCS ", "cs", "Choose the coordinate system of the drawing: search by name, EPSG or country"), L("Settings", "BPSETTINGS ", "gear", "Options, point defaults, updates"), L("Check\nupdates", "BPUPDATE ", "update", "Check GitHub for a newer version and install it"), L("About", "BPABOUT ", "about", "Version and where settings are kept"));
-                AddStackPanel(tab, "Draw / Polylines", 3, L("Connect\npoints", "BPCONNECT ", "connect", "Draw lines through points by code and point number"), L("Lengths", "BPLENGTHS ", "lengths", "List length and area of selected polylines, with table, CSV and labels"), L("Join", "BPJOIN ", "join", "Join lines, polylines and arcs, closing small gaps"), L("Trim", "BPTRIM ", "trim", "Trim to a closed boundary: keep inside or outside"), L("Label", "BPLABEL ", "label", "Write length and area next to the selected polylines"), L("Auto\nleader", "BPLEADER ", "leader", "Select shapes: make a leader from each with its length or area"), L("Vertices to\npoints", "BPVERTS ", "verts", "Make a numbered point at every vertex"), L("Coordinates", "BPCOORD ", "coord", "Write E and N at points and vertices"));
-                AddStackPanel(tab, "Hatch", 2, L("Merge", "BPHATCHMERGE ", "merge", "Combine several hatches into one"), L("Split", "BPHATCHSPLIT ", "split", "Split a hatch into one hatch per separate area"));
-                AddStackPanel(tab, "QA / Plot", 2, L("QA / QC", "BPQAQC ", "qa", "Check points: repeated numbers, duplicates, missing code or elevation, spikes"), L("Shift", "BPSHIFT ", "shift", "Move the selection by dE, dN, dZ"), L("Convert\npoints", "BPCONVPTS ", "convpts", "Convert AutoCAD points to Civil 3D COGO points and back. Needs Civil 3D"), L("Plot\nlayouts", "BPPLOT ", "plot", "Plot the layouts you tick: each layout's own page setup or your settings, to PDF or a printer"));
+                AddStackPanel(tab, "Points", 3, L("Import\npoints", "BPIMPORT ", "import", "Import a points file (txt, csv, xlsx) as points with codes and layers"), L("Export\npoints", "BPEXPORT ", "export", "Export points to a clean text or csv file"), L("Show / hide", "BPISOLATE ", "layers", "Show or hide point categories"), L("Codes", "BPCODES ", "codes", "Edit the point code rules"), L("Connect\npoints", "BPCONNECT ", "connect", "Draw lines through points by code and point number"), L("Vertices to\npoints", "BPVERTS ", "verts", "Make a numbered point at every vertex"), L("Convert\npoints", "BPCONVPTS ", "convpts", "Convert AutoCAD points to Civil 3D COGO points and back. Needs Civil 3D"), L("QA / QC", "BPQAQC ", "qa", "Check points: repeated numbers, duplicates, missing code or elevation, spikes"), L("Coordinates", "BPCOORD ", "coord", "Write E and N at points and vertices"));
+                AddStackPanel(tab, "Live Map", 3, L("Live map", "BPGMAP ", "map", "Show or hide the live Google map behind the drawing"), L("Map options", "BPMAPOPT ", "gear", "Map type, opacity, refresh, coordinate system and Google key"), L("Coordinate\nsystem", "BPGMAPCS ", "cs", "Choose the coordinate system of the drawing: search by name, EPSG or country"));
+                AddStackPanel(tab, "Edit", 2, L("Lengths", "BPLENGTHS ", "lengths", "List length and area of selected polylines, with table, CSV and labels"), L("Join", "BPJOIN ", "join", "Join lines, polylines and arcs, closing small gaps"), L("Trim", "BPTRIM ", "trim", "Trim to a closed boundary: keep inside or outside"), L("Label", "BPLABEL ", "label", "Write length and area next to the selected polylines"), L("Auto\nleader", "BPLEADER ", "leader", "Select shapes: make a leader from each with its length or area"), L("Shift", "BPSHIFT ", "shift", "Move the selection by dE, dN, dZ"), L("Merge hatch", "BPHATCHMERGE ", "merge", "Combine several hatches into one"), L("Split hatch", "BPHATCHSPLIT ", "split", "Split a hatch into one hatch per separate area"));
                 AddStackPanel(tab, "Measure", 3, L("Area", "BPAREA ", "area", "Area of closed polylines in m2, with perimeter in m"), L("Distance", "BPDIST ", "dist", "Distance, azimuth and bearing between two points"), L("Chain\nlength", "BPCHAIN ", "chain", "Length along many picked points, with each segment"), L("Area by\npoints", "BPAREAPTS ", "areapts", "Area and perimeter of picked corners"), L("Angle", "BPANGLE ", "angle", "Angle between two lines, from three points"), L("Pick\ncoordinates", "BPPICK ", "pickxy", "E, N, Z of picked points, with latitude and longitude when a coordinate system is set"));
-                AddStackPanel(tab, "Quantities", 2, L("Sinks", "BPSINKS ", "sinks", "Find where water collects on a surface: sinks with E, N, Z, depth, area and volume"), L("Cut and\nfill", "BPCUTFILL ", "cutfill", "Cut and fill volumes (m3) between the ground and another surface, a level or a plane"));
+                AddStackPanel(tab, "Quantities / Plot", 3, L("Sinks", "BPSINKS ", "sinks", "Find where water collects on a surface: sinks with E, N, Z, depth, area and volume"), L("Cut and\nfill", "BPCUTFILL ", "cutfill", "Cut and fill volumes (m3) between the ground and another surface, a level or a plane"), L("Plot\nlayouts", "BPPLOT ", "plot", "Plot the layouts you tick: each layout's own page setup or your settings, to PDF or a printer"));
+                AddStackPanel(tab, "Settings", 3, L("Settings", "BPSETTINGS ", "sliders", "Options, point defaults, updates"), L("Check\nupdates", "BPUPDATE ", "update", "Check GitHub for a newer version and install it"), L("About", "BPABOUT ", "about", "Version and where settings are kept"));
                 rc.Tabs.Add(tab);
                 Log.Write("Ribbon tab added.");
                 return true;
@@ -67,10 +65,10 @@ namespace BPlus.LiveMap
         {
             var src = new RibbonPanelSource { Title = title }; AddStack(src, rows, btns); tab.Panels.Add(new RibbonPanel { Source = src });
         }
-        /// <summary>Live map (large) with the settings buttons stacked beside it. Placed early so it is never the part that is cut off.</summary>
+        /// <summary>Live map (large) with Map options and the coordinate system stacked beside it.</summary>
         static void AddMapPanel(RibbonTab tab, params string[][] settings)
         {
-            var src = new RibbonPanelSource { Title = "Map & settings" };
+            var src = new RibbonPanelSource { Title = "Live Map" };
             src.Items.Add(new RibbonButton { Text = "Live\nmap", ShowText = true, ShowImage = true, Size = RibbonItemSize.Large, Orientation = System.Windows.Controls.Orientation.Vertical, LargeImage = Icon(32, "map"), Image = Icon(16, "map"), CommandHandler = new Cmd("BPGMAP "), CommandParameter = "BPGMAP ", ToolTip = "Show or hide the live Google map behind the drawing" });
             var all = new List<string[]> { L("Map options", "BPMAPOPT ", "gear", "Map type, opacity, refresh, coordinate system and Google key") }; all.AddRange(settings);
             AddStack(src, 3, all.ToArray());
@@ -216,6 +214,11 @@ namespace BPlus.LiveMap
                 {
                     g.DrawLines(white, new[] { new PointF(k(3), k(12)), new PointF(k(10), k(12)), new PointF(k(16), k(24)), new PointF(k(22), k(12)), new PointF(k(29), k(12)) });
                     using (var dp = new Pen(Color.FromArgb(0, 150, 255), 2f * s)) g.DrawLine(dp, k(11), k(18), k(21), k(18));
+                }
+                else if (kind == "sliders")
+                {
+                    g.DrawLine(white, k(5), k(9), k(27), k(9)); g.DrawLine(white, k(5), k(16), k(27), k(16)); g.DrawLine(white, k(5), k(23), k(27), k(23));
+                    g.FillEllipse(Brushes.White, k(9), k(6), k(6), k(6)); g.FillEllipse(Brushes.White, k(18), k(13), k(6), k(6)); g.FillEllipse(Brushes.White, k(11), k(20), k(6), k(6));
                 }
                 else if (kind == "about")
                 {
