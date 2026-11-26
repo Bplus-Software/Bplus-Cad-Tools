@@ -63,13 +63,13 @@ namespace BPlus.LiveMap
             ed.SetCurrentView(v);
         }
 
-        [CommandMethod("BPLENGTHS")]
+        [CommandMethod("BPLENGTHS", CommandFlags.UsePickSet)]
         public static void Lengths()
         {
             Guard("BPLENGTHS", () =>
             {
                 var doc = Doc; var ed = doc.Editor;
-                var psr = ed.GetSelection(new PromptSelectionOptions { MessageForAdding = "\nSelect polylines, lines or arcs" }, new SelectionFilter(new[] { new TypedValue((int)DxfCode.Start, CrvFilter) }));
+                var psr = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = "\nSelect polylines, lines or arcs" }, CrvFilter);
                 if (psr.Status != PromptStatus.OK) return;
                 var ids = psr.Value.GetObjectIds(); var rows = LenRows(doc, ids);
                 if (rows.Count == 0) { ed.WriteMessage("\n[B+] Nothing measurable was selected.\n"); return; }
@@ -160,13 +160,13 @@ namespace BPlus.LiveMap
             return n;
         }
 
-        [CommandMethod("BPLABEL")]
+        [CommandMethod("BPLABEL", CommandFlags.UsePickSet)]
         public static void LabelLen()
         {
             Guard("BPLABEL", () =>
             {
                 var doc = Doc; var ed = doc.Editor;
-                var psr = ed.GetSelection(new PromptSelectionOptions { MessageForAdding = "\nSelect polylines, lines or arcs to label" }, new SelectionFilter(new[] { new TypedValue((int)DxfCode.Start, CrvFilter) }));
+                var psr = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = "\nSelect polylines, lines or arcs to label" }, CrvFilter);
                 if (psr.Status != PromptStatus.OK) return;
                 var kw = new PromptKeywordOptions("\nLabel [Length/Area/Both] <Both>: ", "Length Area Both") { AllowNone = true }; var kr = ed.GetKeywords(kw);
                 if (kr.Status != PromptStatus.OK && kr.Status != PromptStatus.None) return;
@@ -176,13 +176,13 @@ namespace BPlus.LiveMap
             });
         }
 
-        [CommandMethod("BPVERTS")]
+        [CommandMethod("BPVERTS", CommandFlags.UsePickSet)]
         public static void VertsToPoints()
         {
             Guard("BPVERTS", () =>
             {
                 var doc = Doc; var ed = doc.Editor;
-                var psr = ed.GetSelection(new PromptSelectionOptions { MessageForAdding = "\nSelect polylines or lines" }, new SelectionFilter(new[] { new TypedValue((int)DxfCode.Start, "LWPOLYLINE,POLYLINE,LINE") }));
+                var psr = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = "\nSelect polylines or lines" }, "LWPOLYLINE,POLYLINE,LINE");
                 if (psr.Status != PromptStatus.OK) return;
                 var sn = ed.GetInteger(new PromptIntegerOptions("\nFirst point number <1>: ") { AllowNone = true, DefaultValue = 1, UseDefaultValue = true, LowerLimit = 0 }); if (sn.Status != PromptStatus.OK) return;
                 int no = sn.Value; var pts = new List<SurveyPoint>(); var seen = new HashSet<string>();
@@ -201,13 +201,13 @@ namespace BPlus.LiveMap
             });
         }
 
-        [CommandMethod("BPCOORD")]
+        [CommandMethod("BPCOORD", CommandFlags.UsePickSet)]
         public static void CoordLabels()
         {
             Guard("BPCOORD", () =>
             {
                 var doc = Doc; var ed = doc.Editor;
-                var psr = ed.GetSelection(new PromptSelectionOptions { MessageForAdding = "\nSelect points, polylines or lines to label with E, N" }, new SelectionFilter(new[] { new TypedValue((int)DxfCode.Start, "POINT,LWPOLYLINE,POLYLINE,LINE") }));
+                var psr = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = "\nSelect points, polylines or lines to label with E, N" }, "POINT,LWPOLYLINE,POLYLINE,LINE");
                 if (psr.Status != PromptStatus.OK) return;
                 double th = Config.TextHeight; int n = 0; var seen = new HashSet<string>();
                 using (doc.LockDocument())
@@ -272,13 +272,13 @@ namespace BPlus.LiveMap
             });
         }
 
-        [CommandMethod("BPKMLEXP")]
+        [CommandMethod("BPKMLEXP", CommandFlags.UsePickSet)]
         public static void KmlExport()
         {
             Guard("BPKMLEXP", () =>
             {
                 var doc = Doc; var ed = doc.Editor;
-                var psr = ed.GetSelection(new PromptSelectionOptions { MessageForAdding = "\nSelect points, polylines and lines to export" }, new SelectionFilter(new[] { new TypedValue((int)DxfCode.Start, "POINT,AECC_COGO_POINT,LWPOLYLINE,POLYLINE,LINE") }));
+                var psr = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = "\nSelect points, polylines and lines to export" }, "POINT,AECC_COGO_POINT,LWPOLYLINE,POLYLINE,LINE");
                 if (psr.Status != PromptStatus.OK) return;
                 var cs = NeedCs(doc); if (cs == null) return;
                 string path; using (var d = new SaveFileDialog { Filter = "KMZ|*.kmz|KML|*.kml", FileName = "export.kmz", Title = "Export KML or KMZ" }) { if (d.ShowDialog() != DialogResult.OK) return; path = d.FileName; }
@@ -349,13 +349,13 @@ namespace BPlus.LiveMap
             return res;
         }
 
-        [CommandMethod("BPHATCHMERGE")]
+        [CommandMethod("BPHATCHMERGE", CommandFlags.UsePickSet)]
         public static void HatchMerge()
         {
             Guard("BPHATCHMERGE", () =>
             {
                 var doc = Doc; var ed = doc.Editor;
-                var psr = ed.GetSelection(new PromptSelectionOptions { MessageForAdding = "\nSelect two or more hatches to merge" }, new SelectionFilter(new[] { new TypedValue((int)DxfCode.Start, "HATCH") }));
+                var psr = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = "\nSelect two or more hatches to merge" }, "HATCH");
                 if (psr.Status != PromptStatus.OK) return;
                 var ids = psr.Value.GetObjectIds(); if (ids.Length < 2) { ed.WriteMessage("\n[B+] Select at least two hatches.\n"); return; }
                 var r = MessageBox.Show("Merge " + ids.Length + " hatches into one hatch object?\n\nIt takes the pattern, scale, colour and layer of the first selected hatch. Boundaries that overlap each other may leave holes.\n\nYes = merge and delete the originals\nNo = merge and keep the originals\nCancel = do nothing", "B+ CAD Tools - Merge hatches", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
@@ -380,13 +380,13 @@ namespace BPlus.LiveMap
             });
         }
 
-        [CommandMethod("BPHATCHSPLIT")]
+        [CommandMethod("BPHATCHSPLIT", CommandFlags.UsePickSet)]
         public static void HatchSplit()
         {
             Guard("BPHATCHSPLIT", () =>
             {
                 var doc = Doc; var ed = doc.Editor;
-                var psr = ed.GetSelection(new PromptSelectionOptions { MessageForAdding = "\nSelect hatches to split" }, new SelectionFilter(new[] { new TypedValue((int)DxfCode.Start, "HATCH") }));
+                var psr = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = "\nSelect hatches to split" }, "HATCH");
                 if (psr.Status != PromptStatus.OK) return;
                 var ids = psr.Value.GetObjectIds();
                 var r = MessageBox.Show("Split each selected hatch into one hatch per separate area?\n\nIslands (holes) stay with the area that contains them.\n\nYes = split and delete the originals\nNo = split and keep the originals\nCancel = do nothing", "B+ CAD Tools - Split hatches", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
@@ -432,13 +432,13 @@ namespace BPlus.LiveMap
             });
         }
 
-        [CommandMethod("BPLEADER")]
+        [CommandMethod("BPLEADER", CommandFlags.UsePickSet)]
         public static void AutoLeader()
         {
             Guard("BPLEADER", () =>
             {
                 var doc = Doc; var ed = doc.Editor;
-                var psr = ed.GetSelection(new PromptSelectionOptions { MessageForAdding = "\nSelect shapes to label with leaders" }, new SelectionFilter(new[] { new TypedValue((int)DxfCode.Start, CrvFilter + ",POINT") }));
+                var psr = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = "\nSelect shapes to label with leaders" }, CrvFilter + ",POINT");
                 if (psr.Status != PromptStatus.OK) return;
                 var allIds = psr.Value.GetObjectIds();
                 var ptIds = allIds.Where(i => i.ObjectClass.DxfName == "POINT").ToArray(); var ids = allIds.Where(i => i.ObjectClass.DxfName != "POINT").ToArray();

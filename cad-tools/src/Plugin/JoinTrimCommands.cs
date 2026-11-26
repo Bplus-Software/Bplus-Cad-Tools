@@ -37,13 +37,13 @@ namespace BPlus.LiveMap
             src.Add(new JSrc { Id = id, Elev = elev }); p.Src[0] = src.Count - 1; return p;
         }
 
-        [CommandMethod("BPJOIN")]
+        [CommandMethod("BPJOIN", CommandFlags.UsePickSet)]
         public static void JoinShapes()
         {
             Guard("BPJOIN", () =>
             {
                 var doc = Doc; var ed = doc.Editor;
-                var psr = ed.GetSelection(new PromptSelectionOptions { MessageForAdding = "\nSelect lines, polylines and arcs to join" }, new SelectionFilter(new[] { new TypedValue((int)DxfCode.Start, "LWPOLYLINE,LINE,ARC") }));
+                var psr = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = "\nSelect lines, polylines and arcs to join" }, "LWPOLYLINE,LINE,ARC");
                 if (psr.Status != PromptStatus.OK) return;
                 var src = new List<JSrc>(); var paths = new List<JPath>(); int skipped = 0;
                 using (var tr = doc.Database.TransactionManager.StartTransaction())
@@ -161,16 +161,16 @@ namespace BPlus.LiveMap
             return n;
         }
 
-        [CommandMethod("BPTRIM")]
+        [CommandMethod("BPTRIM", CommandFlags.UsePickSet)]
         public static void TrimToBoundary()
         {
             Guard("BPTRIM", () =>
             {
-                var doc = Doc; var ed = doc.Editor;
+                var doc = Doc; var ed = doc.Editor; var pre = Sel.Peek(ed);
                 var peo = new PromptEntityOptions("\nPick the closed polyline to use as the boundary: "); peo.SetRejectMessage("\nOnly a polyline can be the boundary."); peo.AddAllowedClass(typeof(AcPoly), true);
                 var per = ed.GetEntity(peo); if (per.Status != PromptStatus.OK) return;
                 double area; Extents3d bx; using (var tr = doc.Database.TransactionManager.StartTransaction()) { var b = (AcPoly)tr.GetObject(per.ObjectId, OpenMode.ForRead); if (!b.Closed) { ed.WriteMessage("\n[B+] The boundary must be a closed polyline.\n"); return; } area = b.Area; bx = b.GeometricExtents; tr.Commit(); }
-                var psr = ed.GetSelection(new PromptSelectionOptions { MessageForAdding = "\nSelect objects to trim (Enter = only the objects crossing or inside the polygon's area)" });
+                var psr = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = "\nSelect objects to trim (Enter = only the objects crossing or inside the polygon's area)" }, null, pre);
                 ObjectId[] ids;
                 if (psr.Status == PromptStatus.OK) ids = psr.Value.GetObjectIds();
                 else if (psr.Status == PromptStatus.Error) { var all = ed.SelectCrossingWindow(bx.MinPoint, bx.MaxPoint); if (all.Status != PromptStatus.OK) { ed.WriteMessage("\n[B+] No objects in the polygon's area.\n"); return; } ids = all.Value.GetObjectIds(); }

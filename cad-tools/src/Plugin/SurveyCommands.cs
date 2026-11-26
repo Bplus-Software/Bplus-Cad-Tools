@@ -127,14 +127,14 @@ namespace BPlus.LiveMap
             });
         }
 
-        [CommandMethod("BPCONNECT")]
+        [CommandMethod("BPCONNECT", CommandFlags.UsePickSet)]
         public static void ConnectPts()
         {
             Guard("BPCONNECT", () =>
             {
                 var doc = Doc; var ed = doc.Editor;
                 var opt = new PromptSelectionOptions { MessageForAdding = "\nSelect points (Enter for all points)" };
-                var psr = ed.GetSelection(opt, new SelectionFilter(new[] { new TypedValue((int)DxfCode.Start, "POINT,AECC_COGO_POINT") }));
+                var psr = Sel.Get(ed, opt, "POINT,AECC_COGO_POINT");
                 ICollection<ObjectId> only = null;
                 if (psr.Status == PromptStatus.OK) only = psr.Value.GetObjectIds();
                 else if (psr.Status != PromptStatus.Error) return;
@@ -166,13 +166,13 @@ namespace BPlus.LiveMap
             });
         }
 
-        [CommandMethod("BPAREA")]
+        [CommandMethod("BPAREA", CommandFlags.UsePickSet)]
         public static void Area()
         {
             Guard("BPAREA", () =>
             {
                 var doc = Doc; var ed = doc.Editor;
-                var psr = ed.GetSelection(new PromptSelectionOptions { MessageForAdding = "\nSelect closed polylines" }, new SelectionFilter(new[] { new TypedValue((int)DxfCode.Start, "LWPOLYLINE,POLYLINE") }));
+                var psr = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = "\nSelect closed polylines" }, "LWPOLYLINE,POLYLINE");
                 if (psr.Status != PromptStatus.OK) return;
                 try { var iu = Convert.ToInt32(AcApp.GetSystemVariable("INSUNITS")); if (iu != 6 && iu != 0) ed.WriteMessage("\n[B+] Note: this drawing's units (INSUNITS=" + iu + ") are not metres. Results below are in drawing units, shown as m and m2."); } catch { }
                 var kw = new PromptKeywordOptions("\nPlace an area label for each? [Yes/No] <No>: ", "Yes No") { AllowNone = true }; var kr = ed.GetKeywords(kw);
@@ -205,13 +205,13 @@ namespace BPlus.LiveMap
             });
         }
 
-        [CommandMethod("BPSHIFT")]
+        [CommandMethod("BPSHIFT", CommandFlags.UsePickSet)]
         public static void Shift()
         {
             Guard("BPSHIFT", () =>
             {
                 var doc = Doc; var ed = doc.Editor;
-                var psr = ed.GetSelection(new PromptSelectionOptions { MessageForAdding = "\nSelect objects to shift" }); if (psr.Status != PromptStatus.OK) return;
+                var psr = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = "\nSelect objects to shift" }, null); if (psr.Status != PromptStatus.OK) return;
                 int cnt = psr.Value.Count; bool pick; double[] d;
                 if (!ShiftUi.Ask(cnt, out pick, out d)) return;
                 if (pick)

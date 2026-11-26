@@ -35,7 +35,8 @@ namespace BPlus.LiveMap
                 AddPanel(tab, "Polylines", L("Lengths", "BPLENGTHS ", "lengths", "List length and area of selected polylines, with table, CSV and labels"), L("Join", "BPJOIN ", "join", "Join lines, polylines and arcs, closing small gaps"), L("Trim", "BPTRIM ", "trim", "Trim to a closed boundary: keep inside or outside"), L("Label", "BPLABEL ", "label", "Write length and area next to the selected polylines"), L("Auto\nleader", "BPLEADER ", "leader", "Select shapes: make a leader from each with its length or area"), L("Vertices to\npoints", "BPVERTS ", "verts", "Make a numbered point at every vertex"), L("Coordinates", "BPCOORD ", "coord", "Write E and N at points and vertices"));
                 AddPanel(tab, "Hatch", L("Merge", "BPHATCHMERGE ", "merge", "Combine several hatches into one"), L("Split", "BPHATCHSPLIT ", "split", "Split a hatch into one hatch per separate area"));
                 AddPanel(tab, "Survey QA", L("QA / QC", "BPQAQC ", "qa", "Check points: repeated numbers, duplicates, missing code or elevation, spikes"), L("Shift", "BPSHIFT ", "shift", "Move the selection by dE, dN, dZ"));
-                AddPanel(tab, "Quantities", L("Area", "BPAREA ", "area", "Area of closed polylines in m2, with perimeter in m"), L("Distance", "BPDIST ", "dist", "Distance, azimuth and bearing between two points"));
+                AddPanel(tab, "Measure", L("Area", "BPAREA ", "area", "Area of closed polylines in m2, with perimeter in m"), L("Distance", "BPDIST ", "dist", "Distance, azimuth and bearing between two points"));
+                AddPanel(tab, "Quantities", L("Sinks", "BPSINKS ", "sinks", "Find where water collects on a surface: sinks with E, N, Z, depth, area and volume"), L("Cut and\nfill", "BPCUTFILL ", "cutfill", "Cut and fill volumes (m3) between the ground and another surface, a level or a plane"));
                 var src = new RibbonPanelSource { Title = "Live Map" };
                 var panel = new RibbonPanel { Source = src };
                 var main = new RibbonButton { Text = "Live\nmap", ShowText = true, ShowImage = true, Size = RibbonItemSize.Large, Orientation = System.Windows.Controls.Orientation.Vertical, LargeImage = Icon(32, "map"), Image = Icon(16, "map"), CommandHandler = new Cmd("BPGMAP "), CommandParameter = "BPGMAP ", ToolTip = "Show or hide the live Google map behind the drawing" };
@@ -139,6 +140,21 @@ namespace BPlus.LiveMap
                 {
                     g.DrawRectangle(white, k(8), k(8), k(16), k(16));
                     using (var dp = new Pen(Color.FromArgb(0, 150, 255), 2f * s)) g.DrawLine(dp, k(3), k(16), k(29), k(16));
+                }
+                else if (kind == "cutfill")
+                {
+                    g.DrawLines(white, new[] { new PointF(k(3), k(14)), new PointF(k(11), k(8)), new PointF(k(21), k(20)), new PointF(k(29), k(14)) });
+                    using (var dp = new Pen(Color.FromArgb(0, 150, 255), 2f * s)) g.DrawLine(dp, k(3), k(16), k(29), k(16));
+                }
+                else if (kind == "cutfill")
+                {
+                    g.DrawLines(white, new[] { new PointF(k(3), k(14)), new PointF(k(11), k(8)), new PointF(k(21), k(20)), new PointF(k(29), k(14)) });
+                    using (var dp = new Pen(Color.FromArgb(0, 150, 255), 2f * s)) g.DrawLine(dp, k(3), k(16), k(29), k(16));
+                }
+                else if (kind == "sinks")
+                {
+                    g.DrawLines(white, new[] { new PointF(k(3), k(12)), new PointF(k(10), k(12)), new PointF(k(16), k(24)), new PointF(k(22), k(12)), new PointF(k(29), k(12)) });
+                    using (var dp = new Pen(Color.FromArgb(0, 150, 255), 2f * s)) g.DrawLine(dp, k(11), k(18), k(21), k(18));
                 }
                 else if (kind == "about")
                 {

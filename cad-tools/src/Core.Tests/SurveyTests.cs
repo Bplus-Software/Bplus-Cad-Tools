@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System;
 using System.IO;
 using System.IO.Compression;
@@ -85,6 +86,34 @@ public class SurveyTests
     [Fact] public void ReverseFlipsBulge() { var p = new JPath(); p.V.Add(new JV(0, 0, 1)); p.V.Add(new JV(2, 0, 0)); p.V.Add(new JV(2, 2, 0)); p.Reverse(); Assert.Equal(0, p.V[0].B); Assert.Equal(-1, p.V[1].B); }
     [Fact] public void PolyContains() { var sq = Poly2D.Flatten(new[] { new JV(0, 0), new JV(10, 0), new JV(10, 10), new JV(0, 10) }, true); Assert.True(Poly2D.Contains(sq, 5, 5)); Assert.True(Poly2D.Contains(sq, 10, 5)); Assert.False(Poly2D.Contains(sq, 11, 5)); var semi = Poly2D.Flatten(new[] { new JV(0, 0, 1), new JV(2, 0) }, true); Assert.True(Poly2D.Contains(semi, 1, -0.9)); Assert.False(Poly2D.Contains(semi, 1, 0.5)); }
 
+    static Grid BowlGrid(int n, Func<int, int, double> f) { var g = new Grid { X0 = 0, Y0 = 0, Cell = 1, NX = n, NY = n, Z = new double[n * n] }; for (int j = 0; j < n; j++) for (int i = 0; i < n; i++) g.Z[j * n + i] = f(i, j); return g; }
+    [Fact] public void SinkFoundInBowl()
+    {
+        // slope down to the right but with a 1 m deep hole in the middle
+        var g = BowlGrid(21, (i, j) => 20 - i * 0.0 + ((i >= 8 && i <= 12 && j >= 8 && j <= 12) ? -1 : 0));
+        int ig; var s = Sinks.Analyze(g, 0.05, 1, out ig); Assert.Single(s); Assert.Equal(1.0, s[0].Depth, 6); Assert.Equal(25.0, s[0].Area, 6); Assert.Equal(25.0, s[0].Volume, 6); Assert.Equal(1, s[0].No); Assert.Single(s[0].Outline);
+    }
+    [Fact] public void NoSinkOnSlope() { var g = BowlGrid(15, (i, j) => 10 - i * 0.1); int ig; Assert.Empty(Sinks.Analyze(g, 0.01, 0.1, out ig)); }
+    [Fact] public void SmallSinkIgnoredAndCounted() { var g = BowlGrid(15, (i, j) => 10 + (i == 7 && j == 7 ? -0.02 : 0)); int ig; var s = Sinks.Analyze(g, 0.05, 1, out ig); Assert.Empty(s); Assert.Equal(1, ig); }
+    [Fact] public void TwoSinksSortedByDepth()
+    {
+        var g = BowlGrid(31, (i, j) => 20 + ((i >= 3 && i <= 5 && j >= 3 && j <= 5) ? -0.5 : 0) + ((i >= 20 && i <= 24 && j >= 20 && j <= 24) ? -2 : 0));
+        int ig; var s = Sinks.Analyze(g, 0.05, 1, out ig); Assert.Equal(2, s.Count); Assert.Equal(2.0, s[0].Depth, 6); Assert.Equal(1, s[0].No); Assert.Equal(2, s[1].No);
+    }
+    [Fact] public void DelaunayPlaneRaster()
+    {
+        var pts = new List<double[]>(); for (int i = 0; i <= 10; i += 5) for (int j = 0; j <= 10; j += 5) pts.Add(new[] { (double)i, j, i + 2.0 * j });
+        var tr = Sinks.Delaunay(pts); Assert.Equal(8, tr.Count); double uc; var g = Sinks.Rasterize(tr, 1, out uc);
+        Assert.Equal(11, g.NX); Assert.Equal(3 + 2 * 4, g.Z[4 * g.NX + 3], 6);
+    }
+    [Fact] public void DelaunayFindsBowlMinimum()
+    {
+        var pts = new List<double[]>(); var r = new Random(5);
+        for (int i = 0; i <= 20; i++) for (int j = 0; j <= 20; j++) { double dx = i - 10, dy = j - 10; pts.Add(new[] { (double)i, j, 5 + Math.Sqrt(dx * dx + dy * dy) * 0.3 + (i == 0 || j == 0 || i == 20 || j == 20 ? 5 : 0) }); }
+        double uc; var g = Sinks.Rasterize(Sinks.Delaunay(pts), 1, out uc); int ig; var s = Sinks.Analyze(g, 0.05, 1, out ig);
+        Assert.True(s.Count >= 1); Assert.Equal(10, s[0].E, 0); Assert.Equal(10, s[0].N, 0); Assert.Equal(5, s[0].LowZ, 1);
+    }
+
     [Fact] public void CodesClassify()
     {
         var r = CodeRules.Default();
@@ -165,4 +194,37 @@ public class UpdateTests
     [Fact] public void Sha256OfBytes() { using (var m = new System.IO.MemoryStream(new byte[] { 97, 98, 99 })) Assert.Equal("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", Updater.Sha256Hex(m)); }
     [Fact] public void JsonEscapes() { var d = (System.Collections.Generic.Dictionary<string, object>)MiniJson.Parse("{\"a\":\"x\\u0041\\n\\\"q\\\"\",\"b\":[1,2.5,true,null]}"); Assert.Equal("xA\n\"q\"", d["a"]); Assert.Equal(4, ((System.Collections.Generic.List<object>)d["b"]).Count); }
     [Fact] public void VersionParsing() { Assert.Equal(new Version(0, 3, 2, 0), Updater.ParseVersion("0.3.2-experimental")); Assert.Null(Updater.ParseVersion("abc")); Assert.Null(Updater.ParseVersion("1")); }
+}
+
+public class CutFillTests
+{
+    [Fact] public void FlatCutOverRectangle()
+    {   // ground at 12, level 10, 20x10 m => cut 2 * 200 = 400, no fill
+        var r = CutFill.Compute((x, y) => 12, (x, y) => 10, 0, 0, 20, 10, 1, null, 1);
+        Assert.Equal(400.0, r.CutVolume, 6); Assert.Equal(0.0, r.FillVolume, 6); Assert.Equal(200.0, r.CutArea, 6); Assert.Equal(2.0, r.MeanCut, 6); Assert.Equal(400.0, r.Net, 6);
+    }
+    [Fact] public void SlopeAgainstLevelSplitsCutAndFill()
+    {   // ground rises 0..10 along x, level 5: cut triangle = fill triangle = 0.5*5*5*10 = 125 each
+        var r = CutFill.Compute((x, y) => x, (x, y) => 5, 0, 0, 10, 10, 0.5, null, 1);
+        Assert.Equal(125.0, r.CutVolume, 6); Assert.Equal(125.0, r.FillVolume, 6); Assert.Equal(0.0, r.Net, 6);
+    }
+    [Fact] public void PolygonLimitsTheArea()
+    {
+        var sq = new List<double[]> { new[] { 0.0, 0 }, new[] { 10.0, 0 }, new[] { 10.0, 10 }, new[] { 0.0, 10 } };
+        var r = CutFill.Compute((x, y) => 1, (x, y) => 0, -20, -20, 40, 40, 1, (x, y) => CutFill.InPolygon(sq, x, y), 1);
+        Assert.Equal(100.0, r.CutVolume, 6);
+    }
+    [Fact] public void SwellScalesCutInNet()
+    {
+        var r = CutFill.Compute((x, y) => 2, (x, y) => 0, 0, 0, 10, 10, 1, null, 1.25); Assert.Equal(200.0, r.CutVolume, 6); Assert.Equal(250.0, r.Net, 6);
+    }
+    [Fact] public void NoDataCellsSkipped()
+    {
+        var r = CutFill.Compute((x, y) => x < 5 ? double.NaN : 1, (x, y) => 0, 0, 0, 10, 10, 1, null, 1); Assert.Equal(50.0, r.CutVolume, 6);
+    }
+    [Fact] public void TriSurfaceInterpolates()
+    {
+        var s = new TriSurface(new[] { new Tri(0, 0, 0, 10, 0, 10, 0, 10, 0), new Tri(10, 0, 10, 10, 10, 10, 0, 10, 0) });
+        Assert.Equal(5.0, s.Z(5, 2), 6); Assert.Equal(10.0, s.Z(10, 5), 6); Assert.True(double.IsNaN(s.Z(11, 5)));
+    }
 }
