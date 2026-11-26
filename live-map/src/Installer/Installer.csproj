@@ -7,7 +7,7 @@
     <LangVersion>10</LangVersion>
     <AssemblyName>BPlusLiveMap-Setup</AssemblyName>
     <RootNamespace>BPlus.LiveMap.Setup</RootNamespace>
-    <AssemblyVersion>0.2.0.0</AssemblyVersion>
+    <AssemblyVersion>0.3.0.0</AssemblyVersion>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
   <ItemGroup>

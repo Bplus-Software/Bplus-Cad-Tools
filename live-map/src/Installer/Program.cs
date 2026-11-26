@@ -44,7 +44,7 @@ namespace BPlus.LiveMap.Setup
                 {
                     string exe = Assembly.GetExecutingAssembly().Location;
                     k.SetValue("DisplayName", "BPlus Live Map (experimental)");
-                    k.SetValue("DisplayVersion", "0.2.0");
+                    k.SetValue("DisplayVersion", "0.3.0");
                     k.SetValue("Publisher", "BPlus Software");
                     k.SetValue("InstallLocation", target);
                     k.SetValue("UninstallString", "\"" + exe + "\" /U");

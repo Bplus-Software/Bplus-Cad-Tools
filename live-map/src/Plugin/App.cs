@@ -14,7 +14,7 @@ namespace BPlus.LiveMap
 {
     public class App : IExtensionApplication
     {
-        public static string Version = "0.2.0-experimental";
+        public static string Version = "0.3.0-experimental";
         public void Initialize()
         {
             try
@@ -30,7 +30,7 @@ namespace BPlus.LiveMap
         public void Terminate() { Engine.Shutdown(); Log.Write("Shutdown."); }
     }
 
-    public class Commands
+    public partial class Commands
     {
         public static string LastError = "";
         static void Guard(string name, Action a)
