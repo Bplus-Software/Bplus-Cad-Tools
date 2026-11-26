@@ -45,38 +45,6 @@ namespace BPlus.LiveMap
         public static void Style(Control c) { c.BackColor = Field; c.ForeColor = Text; }
     }
 
-    static class CsPicker
-    {
-        static readonly int[] Codes = { 32637, 32638, 32639, 20437, 20438, 20439, 4326, 3857, 0 };
-        static readonly string[] Names = { "WGS 84 / UTM zone 37N (EPSG:32637)", "WGS 84 / UTM zone 38N (EPSG:32638)", "WGS 84 / UTM zone 39N (EPSG:32639)", "Ain el Abd / UTM zone 37N (EPSG:20437)", "Ain el Abd / UTM zone 38N (EPSG:20438)", "Ain el Abd / UTM zone 39N (EPSG:20439)", "WGS 84 longitude/latitude (EPSG:4326)", "Web Mercator (EPSG:3857)", "Other EPSG code..." };
-        public static int Ask()
-        {
-            using (var f = Theme.Base("BPlus Live Map - coordinate system", 420, 330))
-            {
-                f.Controls.Add(Theme.Lbl("This drawing has no coordinate system. Choose the one it uses:", 16, 14, 390));
-                var list = new ListBox { Left = 16, Top = 42, Width = 388, Height = 170, BorderStyle = BorderStyle.None };
-                Theme.Style(list); list.Items.AddRange(Names); list.SelectedIndex = 2;
-                var other = new TextBox { Left = 16, Top = 222, Width = 120, BorderStyle = BorderStyle.FixedSingle, Visible = false };
-                Theme.Style(other);
-                var hint = Theme.Lbl("EPSG code:", 144, 225, 200, true); hint.Visible = false;
-                list.SelectedIndexChanged += (s, e) => { bool o = list.SelectedIndex == Codes.Length - 1; other.Visible = o; hint.Visible = o; };
-                f.Controls.AddRange(new Control[] { list, other, hint });
-                f.Controls.Add(Theme.Lbl("The choice is saved inside this drawing. Change it later with BPGMAPCS.", 16, 256, 390, true));
-                var ok = Theme.Btn("OK", 224, 288, 85, true); var cancel = Theme.Btn("Cancel", 319, 288, 85);
-                int result = 0;
-                ok.Click += (s, e) =>
-                {
-                    int c = Codes[list.SelectedIndex];
-                    if (c == 0) { if (!int.TryParse(other.Text.Trim(), out c) || CoordSys.FromEpsg(c) == null) { MessageBox.Show(f, "That EPSG code is not supported. Supported: 4326, 3857, 326xx and 327xx UTM, 20435 to 20439.", "BPlus Live Map"); return; } }
-                    result = c; f.DialogResult = DialogResult.OK;
-                };
-                cancel.Click += (s, e) => f.DialogResult = DialogResult.Cancel;
-                f.Controls.AddRange(new Control[] { ok, cancel }); f.AcceptButton = ok; f.CancelButton = cancel;
-                return f.ShowDialog() == DialogResult.OK ? result : 0;
-            }
-        }
-    }
-
     static class SettingsDialog
     {
         public static void Show()

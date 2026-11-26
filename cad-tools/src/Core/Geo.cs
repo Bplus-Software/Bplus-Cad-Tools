@@ -10,15 +10,16 @@ namespace BPlus.LiveMap.Core
         public Ellipsoid(double a, double invF) { A = a; F = 1.0 / invF; E2 = F * (2 - F); }
         public static readonly Ellipsoid Wgs84 = new Ellipsoid(6378137.0, 298.257223563);
         public static readonly Ellipsoid International1924 = new Ellipsoid(6378388.0, 297.0);
+        public static readonly Ellipsoid Helmert1906 = new Ellipsoid(6378200.0, 298.3);
     }
 
     /// <summary>Transverse Mercator (Kruger series, 6th order), accurate to well under a millimetre inside a UTM zone.</summary>
     public sealed class TransverseMercator
     {
-        readonly Ellipsoid _e; readonly double _lon0, _k0, _fe, _fn;
+        readonly Ellipsoid _e; readonly double _lon0, _k0, _fe, _fn, _y0;
         readonly double _bigA; readonly double[] _alpha = new double[7], _beta = new double[7];
 
-        public TransverseMercator(Ellipsoid e, double lon0Deg, double k0, double falseEasting, double falseNorthing)
+        public TransverseMercator(Ellipsoid e, double lon0Deg, double k0, double falseEasting, double falseNorthing, double lat0Deg = 0)
         {
             _e = e; _lon0 = lon0Deg * Math.PI / 180; _k0 = k0; _fe = falseEasting; _fn = falseNorthing;
             double n = e.F / (2 - e.F);
@@ -36,6 +37,7 @@ namespace BPlus.LiveMap.Core
             _beta[4] = 4397 * n4 / 161280 - 11 * n5 / 504 - 830251 * n6 / 7257600;
             _beta[5] = 4583 * n5 / 161280 - 108847 * n6 / 3991680;
             _beta[6] = 20648693 * n6 / 638668800;
+            if (lat0Deg != 0) { var z = new TransverseMercator(e, lon0Deg, k0, 0, 0); double ze, zn; z.Forward(lat0Deg, lon0Deg, out ze, out zn); _y0 = zn; }
         }
 
         public void Forward(double latDeg, double lonDeg, out double easting, out double northing)
@@ -52,12 +54,12 @@ namespace BPlus.LiveMap.Core
                 eta += _alpha[j] * Math.Cos(2 * j * xiP) * Math.Sinh(2 * j * etaP);
             }
             easting = _fe + _k0 * _bigA * eta;
-            northing = _fn + _k0 * _bigA * xi;
+            northing = _fn - _y0 + _k0 * _bigA * xi;
         }
 
         public void Inverse(double easting, double northing, out double latDeg, out double lonDeg)
         {
-            double xi = (northing - _fn) / (_k0 * _bigA), eta = (easting - _fe) / (_k0 * _bigA);
+            double xi = (northing - _fn + _y0) / (_k0 * _bigA), eta = (easting - _fe) / (_k0 * _bigA);
             double xiP = xi, etaP = eta;
             for (int j = 1; j <= 6; j++)
             {
@@ -120,7 +122,8 @@ namespace BPlus.LiveMap.Core
         public bool IsGeographic { get; private set; }
         /// <summary>Metres per drawing unit.</summary>
         public double UnitToMetre { get; set; }
-        readonly TransverseMercator _tm; readonly bool _ainElAbd; readonly bool _webMerc;
+        readonly TransverseMercator _tm; readonly bool _ainElAbd; readonly bool _webMerc; Ellipsoid _shiftEll; double _sx, _sy, _sz;
+        public HashSet<string> Groups = new HashSet<string>(); public bool Unverified { get; private set; } public string Region { get; private set; }
 
         CoordSys(int epsg, string name, TransverseMercator tm, bool ain, bool geo, bool webMerc)
         { Epsg = epsg; Name = name; _tm = tm; _ainElAbd = ain; IsGeographic = geo; _webMerc = webMerc; UnitToMetre = 1.0; }
@@ -134,7 +137,15 @@ namespace BPlus.LiveMap.Core
             if (epsg == 3857) return new CoordSys(epsg, "WGS 84 / Pseudo-Mercator", null, false, false, true);
             if (epsg >= 32601 && epsg <= 32660) return Utm(epsg, epsg - 32600, true, Ellipsoid.Wgs84, false, "WGS 84 / UTM zone " + (epsg - 32600) + "N");
             if (epsg >= 32701 && epsg <= 32760) return Utm(epsg, epsg - 32700, false, Ellipsoid.Wgs84, false, "WGS 84 / UTM zone " + (epsg - 32700) + "S");
-            if (epsg >= 20435 && epsg <= 20439) return Utm(epsg, epsg - 20400, true, Ellipsoid.International1924, true, "Ain el Abd / UTM zone " + (epsg - 20400) + "N");
+            if (epsg >= 20435 && epsg <= 20439) { var a = Utm(epsg, epsg - 20400, true, Ellipsoid.International1924, true, "Ain el Abd / UTM zone " + (epsg - 20400) + "N"); a._shiftEll = Ellipsoid.International1924; a._sx = AinDx; a._sy = AinDy; a._sz = AinDz; return a; }
+            // Egypt 1907 belts: Transverse Mercator on the Helmert 1906 ellipsoid, shifted to WGS 84 with EPSG transformation 1148 (-130, 110, -13 m, accuracy about 11 m; the best published one is within about 5 m of it).
+            if (epsg >= 22991 && epsg <= 22994)
+            {
+                double lon0 = epsg == 22991 ? 35 : epsg == 22992 ? 31 : 27, fe = epsg == 22991 ? 300000 : epsg == 22992 ? 615000 : 700000, fn = epsg == 22991 ? 1100000 : epsg == 22992 ? 810000 : epsg == 22993 ? 200000 : 1200000;
+                string nm = epsg == 22991 ? "Egypt 1907 / Blue Belt" : epsg == 22992 ? "Egypt 1907 / Red Belt" : epsg == 22993 ? "Egypt 1907 / Purple Belt" : "Egypt 1907 / Extended Purple Belt";
+                var c = new CoordSys(epsg, nm, new TransverseMercator(Ellipsoid.Helmert1906, lon0, 1.0, fe, fn, 30), true, false, false);
+                c._shiftEll = Ellipsoid.Helmert1906; c._sx = -130; c._sy = 110; c._sz = -13; c.Unverified = true; return c;
+            }
             return null;
         }
 
@@ -144,7 +155,23 @@ namespace BPlus.LiveMap.Core
             return new CoordSys(epsg, name, new TransverseMercator(e, lon0, 0.9996, 500000, north ? 0 : 10000000), ain, false, false);
         }
 
-        /// <summary>The list shown in the picker (Saudi Arabia first, then generic UTM zones).</summary>
+        /// <summary>Every system the picker offers, with region and group.</summary>
+        public static List<CoordSys> Catalog()
+        {
+            var l = new List<CoordSys>(); var have = new Dictionary<int, CoordSys>();
+            Action<int, string, string> add = (code, grp, region) => { CoordSys c; if (!have.TryGetValue(code, out c)) { c = FromEpsg(code); if (c == null) return; c.Region = region; have[code] = c; l.Add(c); } c.Groups.Add(grp); };
+            foreach (int c in new[] { 32638, 32637, 32639, 32636, 32640 }) add(c, "Saudi Arabia", "Saudi Arabia");
+            foreach (int c in new[] { 20437, 20438, 20439 }) add(c, "Saudi Arabia", "Saudi Arabia (old datum)");
+            foreach (int c in new[] { 32636, 32635 }) add(c, "Egypt", "Egypt");
+            foreach (int c in new[] { 22992, 22993, 22994, 22991 }) add(c, "Egypt", c == 22991 ? "Egypt, Sinai" : "Egypt (old datum)");
+            foreach (int c in new[] { 32638, 32639, 32640, 32637 }) add(c, "Gulf", "Kuwait, Qatar, UAE, Oman, Bahrain, Iraq (by zone)");
+            for (int z = 1; z <= 60; z++) add(32600 + z, "UTM zones", "North, centre " + (z * 6 - 183) + " E");
+            for (int z = 1; z <= 60; z++) add(32700 + z, "UTM zones", "South, centre " + (z * 6 - 183) + " E");
+            add(4326, "Lat / long", "World (degrees)"); add(3857, "Lat / long", "World web map (metres)");
+            return l;
+        }
+
+        /// <summary>The list shown in the old picker (Saudi Arabia first, then generic UTM zones).</summary>
         public static List<CoordSys> PickerList()
         {
             var l = new List<CoordSys>();
@@ -163,7 +190,7 @@ namespace BPlus.LiveMap.Core
                 lon = x / R * 180 / Math.PI; lat = (2 * Math.Atan(Math.Exp(y / R)) - Math.PI / 2) * 180 / Math.PI; return;
             }
             double la, lo; _tm.Inverse(x, y, out la, out lo);
-            if (_ainElAbd) Datum.Shift(Ellipsoid.International1924, Ellipsoid.Wgs84, AinDx, AinDy, AinDz, la, lo, out la, out lo);
+            if (_ainElAbd) Datum.Shift(_shiftEll, Ellipsoid.Wgs84, _sx, _sy, _sz, la, lo, out la, out lo);
             lat = la; lon = lo;
         }
 
@@ -179,10 +206,31 @@ namespace BPlus.LiveMap.Core
             else
             {
                 double la = lat, lo = lon;
-                if (_ainElAbd) Datum.Shift(Ellipsoid.Wgs84, Ellipsoid.International1924, -AinDx, -AinDy, -AinDz, lat, lon, out la, out lo);
+                if (_ainElAbd) Datum.Shift(Ellipsoid.Wgs84, _shiftEll, -_sx, -_sy, -_sz, lat, lon, out la, out lo);
                 _tm.Forward(la, lo, out x, out y);
             }
             x /= UnitToMetre; y /= UnitToMetre;
+        }
+    }
+
+    public sealed class CsGuess { public CoordSys Cs; public double Lon, Lat; public string Where; }
+
+    public static class CsSuggest
+    {
+        /// <summary>Which systems turn a drawing point (e, n) into a place inside Saudi Arabia or Egypt (rough boxes, not borders).</summary>
+        public static List<CsGuess> Suggest(double e, double n, double unitToMetre)
+        {
+            var r = new List<CsGuess>();
+            foreach (var cs in CoordSys.Catalog())
+            {
+                if (cs.IsGeographic || cs.Epsg == 3857) continue;
+                cs.UnitToMetre = unitToMetre; double lo, la; try { cs.ToLonLat(e, n, out lo, out la); } catch { continue; }
+                string w = null;
+                if (la >= 16.3 && la <= 32.3 && lo >= 34.4 && lo <= 55.8) w = "Saudi Arabia";
+                else if (la >= 21.9 && la <= 31.7 && lo >= 24.6 && lo <= 36.9) w = "Egypt";
+                if (w != null) r.Add(new CsGuess { Cs = cs, Lon = lo, Lat = la, Where = w });
+            }
+            return r;
         }
     }
 }

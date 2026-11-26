@@ -34,8 +34,9 @@ namespace BPlus.LiveMap
                 AddPanel(tab, "Draw", L("Connect\npoints", "BPCONNECT ", "connect", "Draw lines through points by code and point number"));
                 AddPanel(tab, "Polylines", L("Lengths", "BPLENGTHS ", "lengths", "List length and area of selected polylines, with table, CSV and labels"), L("Join", "BPJOIN ", "join", "Join lines, polylines and arcs, closing small gaps"), L("Trim", "BPTRIM ", "trim", "Trim to a closed boundary: keep inside or outside"), L("Label", "BPLABEL ", "label", "Write length and area next to the selected polylines"), L("Auto\nleader", "BPLEADER ", "leader", "Select shapes: make a leader from each with its length or area"), L("Vertices to\npoints", "BPVERTS ", "verts", "Make a numbered point at every vertex"), L("Coordinates", "BPCOORD ", "coord", "Write E and N at points and vertices"));
                 AddPanel(tab, "Hatch", L("Merge", "BPHATCHMERGE ", "merge", "Combine several hatches into one"), L("Split", "BPHATCHSPLIT ", "split", "Split a hatch into one hatch per separate area"));
-                AddPanel(tab, "Survey QA", L("QA / QC", "BPQAQC ", "qa", "Check points: repeated numbers, duplicates, missing code or elevation, spikes"), L("Shift", "BPSHIFT ", "shift", "Move the selection by dE, dN, dZ"));
-                AddPanel(tab, "Measure", L("Area", "BPAREA ", "area", "Area of closed polylines in m2, with perimeter in m"), L("Distance", "BPDIST ", "dist", "Distance, azimuth and bearing between two points"));
+                AddPanel(tab, "Survey QA", L("QA / QC", "BPQAQC ", "qa", "Check points: repeated numbers, duplicates, missing code or elevation, spikes"), L("Shift", "BPSHIFT ", "shift", "Move the selection by dE, dN, dZ"), L("Convert\npoints", "BPCONVPTS ", "convpts", "Convert AutoCAD points to Civil 3D COGO points and back. Needs Civil 3D"));
+                AddPanel(tab, "Plot", L("Plot\nlayouts", "BPPLOT ", "plot", "Plot the layouts you tick: each layout's own page setup or your settings, to PDF or a printer"));
+                AddPanel(tab, "Measure", L("Area", "BPAREA ", "area", "Area of closed polylines in m2, with perimeter in m"), L("Distance", "BPDIST ", "dist", "Distance, azimuth and bearing between two points"), L("Chain\nlength", "BPCHAIN ", "chain", "Length along many picked points, with each segment"), L("Area by\npoints", "BPAREAPTS ", "areapts", "Area and perimeter of picked corners"), L("Angle", "BPANGLE ", "angle", "Angle between two lines, from three points"), L("Pick\ncoordinates", "BPPICK ", "pickxy", "E, N, Z of picked points, with latitude and longitude when a coordinate system is set"));
                 AddPanel(tab, "Quantities", L("Sinks", "BPSINKS ", "sinks", "Find where water collects on a surface: sinks with E, N, Z, depth, area and volume"), L("Cut and\nfill", "BPCUTFILL ", "cutfill", "Cut and fill volumes (m3) between the ground and another surface, a level or a plane"));
                 var src = new RibbonPanelSource { Title = "Live Map" };
                 var panel = new RibbonPanel { Source = src };
@@ -43,7 +44,7 @@ namespace BPlus.LiveMap
                 src.Items.Add(main);
                 src.Items.Add(new RibbonButton { Text = "Map\noptions", ShowText = true, ShowImage = true, Size = RibbonItemSize.Large, Orientation = System.Windows.Controls.Orientation.Vertical, LargeImage = Icon(32, "gear"), Image = Icon(16, "gear"), CommandHandler = new Cmd("BPMAPOPT "), ToolTip = "Map type, opacity, refresh, coordinate system and Google key" });
                 tab.Panels.Add(panel);
-                AddPanel(tab, "Settings", L("Settings", "BPSETTINGS ", "gear", "Options, point defaults, updates"), L("Check\nupdates", "BPUPDATE ", "update", "Check GitHub for a newer version and install it"), L("About", "BPABOUT ", "about", "Version and where settings are kept"));
+                AddPanel(tab, "Settings", L("Coordinate\nsystem", "BPGMAPCS ", "cs", "Choose the coordinate system of the drawing: search by name, EPSG or country"), L("Settings", "BPSETTINGS ", "gear", "Options, point defaults, updates"), L("Check\nupdates", "BPUPDATE ", "update", "Check GitHub for a newer version and install it"), L("About", "BPABOUT ", "about", "Version and where settings are kept"));
                 rc.Tabs.Add(tab);
                 Log.Write("Ribbon tab added.");
                 return true;
@@ -150,6 +151,41 @@ namespace BPlus.LiveMap
                 {
                     g.DrawLines(white, new[] { new PointF(k(3), k(14)), new PointF(k(11), k(8)), new PointF(k(21), k(20)), new PointF(k(29), k(14)) });
                     using (var dp = new Pen(Color.FromArgb(0, 150, 255), 2f * s)) g.DrawLine(dp, k(3), k(16), k(29), k(16));
+                }
+                else if (kind == "chain")
+                {
+                    g.DrawLines(white, new[] { new PointF(k(3), k(24)), new PointF(k(10), k(10)), new PointF(k(19), k(20)), new PointF(k(29), k(7)) });
+                    using (var dp = new Pen(Color.FromArgb(0, 150, 255), 2f * s)) { g.DrawEllipse(dp, k(1), k(22), k(4), k(4)); g.DrawEllipse(dp, k(27), k(5), k(4), k(4)); }
+                }
+                else if (kind == "areapts")
+                {
+                    g.DrawPolygon(white, new[] { new PointF(k(5), k(24)), new PointF(k(8), k(8)), new PointF(k(25), k(6)), new PointF(k(28), k(22)) });
+                    using (var dp = new Pen(Color.FromArgb(0, 150, 255), 2f * s)) g.DrawLine(dp, k(10), k(16), k(22), k(16));
+                }
+                else if (kind == "angle")
+                {
+                    g.DrawLine(white, k(4), k(26), k(28), k(26)); g.DrawLine(white, k(4), k(26), k(22), k(6));
+                    using (var dp = new Pen(Color.FromArgb(0, 150, 255), 2f * s)) g.DrawArc(dp, k(-2), k(20), k(12), k(12), -60, 60);
+                }
+                else if (kind == "pickxy")
+                {
+                    g.DrawLine(white, k(16), k(4), k(16), k(28)); g.DrawLine(white, k(4), k(16), k(28), k(16));
+                    using (var dp = new Pen(Color.FromArgb(0, 150, 255), 2f * s)) g.DrawEllipse(dp, k(10), k(10), k(12), k(12));
+                }
+                else if (kind == "cs")
+                {
+                    g.DrawEllipse(white, k(4), k(4), k(24), k(24)); g.DrawArc(white, k(10), k(4), k(12), k(24), 0, 360); g.DrawLine(white, k(4), k(16), k(28), k(16));
+                    using (var dp = new Pen(Color.FromArgb(0, 150, 255), 2f * s)) g.DrawLine(dp, k(16), k(4), k(16), k(28));
+                }
+                else if (kind == "convpts")
+                {
+                    g.DrawEllipse(white, k(4), k(10), k(8), k(8)); g.DrawEllipse(white, k(20), k(10), k(8), k(8));
+                    using (var dp = new Pen(Color.FromArgb(0, 150, 255), 2f * s)) { g.DrawLine(dp, k(13), k(12), k(19), k(12)); g.DrawLine(dp, k(19), k(16), k(13), k(16)); }
+                }
+                else if (kind == "plot")
+                {
+                    g.DrawRectangle(white, k(8), k(4), k(16), k(10)); g.DrawRectangle(white, k(4), k(14), k(24), k(10)); g.DrawRectangle(white, k(9), k(20), k(14), k(9));
+                    using (var dp = new Pen(Color.FromArgb(0, 150, 255), 2f * s)) g.DrawLine(dp, k(11), k(24), k(21), k(24));
                 }
                 else if (kind == "sinks")
                 {

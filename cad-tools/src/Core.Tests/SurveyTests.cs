@@ -228,3 +228,84 @@ public class CutFillTests
         Assert.Equal(5.0, s.Z(5, 2), 6); Assert.Equal(10.0, s.Z(10, 5), 6); Assert.True(double.IsNaN(s.Z(11, 5)));
     }
 }
+
+public class MeasureTests
+{
+    [Fact] public void RightAngle() { Assert.Equal(90.0, MeasureMath.AngleAt(10, 0, 0, 0, 0, 10), 6); }
+    [Fact] public void StraightAngleIs180() { Assert.Equal(180.0, MeasureMath.AngleAt(-5, 0, 0, 0, 5, 0), 6); }
+    [Fact] public void AngleAcrossNorthIsSmall() { Assert.Equal(20.0, MeasureMath.AngleAt(Math.Sin(-10 * Math.PI / 180), Math.Cos(10 * Math.PI / 180), 0, 0, Math.Sin(10 * Math.PI / 180), Math.Cos(10 * Math.PI / 180)), 6); }
+    [Fact] public void ChainLengths() { var p = new List<double[]> { new[] { 0.0, 0, 0 }, new[] { 3.0, 4, 0 }, new[] { 3.0, 4, 12 } }; Assert.Equal(5.0, MeasureMath.Length2D(p), 9); Assert.Equal(17.0, MeasureMath.Length3D(p), 9); }
+    [Fact] public void CentroidOfSquare() { var p = new List<double[]> { new[] { 0.0, 0 }, new[] { 4.0, 0 }, new[] { 4.0, 4 }, new[] { 0.0, 4 } }; var c = MeasureMath.Centroid(p); Assert.Equal(2.0, c[0], 9); Assert.Equal(2.0, c[1], 9); }
+}
+
+public class EgyptCsTests
+{
+    // PROJ with the same transformation (EPSG 1148: -130, 110, -13 on Helmert 1906) is the oracle.
+    public static IEnumerable<object[]> Ref = new List<object[]> {
+        new object[] { 22991, 28.5, 34.3, 231301.306, 933926.449 },
+        new object[] { 22991, 29.9, 34.8, 280518.675, 1088918.703 },
+        new object[] { 22992, 30.0444, 31.2357, 637570.509, 814926.683 },
+        new object[] { 22992, 31.2, 32.3, 738739.581, 943744.991 },
+        new object[] { 22992, 26.0, 30.0, 514717.755, 367084.973 },
+        new object[] { 22993, 31.0, 27.9, 785798.487, 311184.490 },
+        new object[] { 22993, 29.0, 25.5, 553675.701, 90059.499 },
+        new object[] { 22994, 31.5, 27.2, 718843.455, 1366290.996 },
+        new object[] { 22994, 30.0, 28.5, 844580.723, 1200923.281 },
+    };
+    [Theory, MemberData(nameof(Ref))] public void BeltForwardMatchesProj(int epsg, double lat, double lon, double e, double n)
+    { var cs = CoordSys.FromEpsg(epsg); cs.FromLonLat(lon, lat, out double x, out double y); Assert.InRange(Math.Abs(x - e), 0, 0.02); Assert.InRange(Math.Abs(y - n), 0, 0.02); }
+    [Theory, MemberData(nameof(Ref))] public void BeltRoundTrip(int epsg, double lat, double lon, double e, double n)
+    { var cs = CoordSys.FromEpsg(epsg); cs.ToLonLat(e, n, out double lo, out double la); Assert.InRange(Math.Abs(lo - lon), 0, 1e-7); Assert.InRange(Math.Abs(la - lat), 0, 1e-7); }
+    [Fact] public void BeltsAreMarkedUnverified() { Assert.True(CoordSys.FromEpsg(22992).Unverified); Assert.False(CoordSys.FromEpsg(32638).Unverified); }
+    [Fact] public void CatalogHasGroupsAndNoDuplicates()
+    {
+        var c = CoordSys.Catalog(); Assert.Equal(c.Count, c.Select(x => x.Epsg).Distinct().Count());
+        Assert.Contains(c, x => x.Epsg == 32636 && x.Groups.Contains("Saudi Arabia") && x.Groups.Contains("Egypt"));
+        Assert.Contains(c, x => x.Epsg == 22992 && x.Groups.Contains("Egypt")); Assert.Contains(c, x => x.Epsg == 32640 && x.Groups.Contains("UTM zones"));
+    }
+    [Fact] public void SuggestFindsTheRightZoneForRiyadh()
+    {
+        var cs = CoordSys.FromEpsg(32638); cs.FromLonLat(46.6753, 24.7136, out double x, out double y);
+        var g = CsSuggest.Suggest(x, y, 1.0); Assert.Contains(g, q => q.Cs.Epsg == 32638 && q.Where == "Saudi Arabia");
+    }
+    [Fact] public void SuggestFindsEgyptForCairoRedBelt()
+    {
+        var cs = CoordSys.FromEpsg(22992); cs.FromLonLat(31.2357, 30.0444, out double x, out double y);
+        var g = CsSuggest.Suggest(x, y, 1.0); Assert.Contains(g, q => q.Cs.Epsg == 22992 && q.Where == "Egypt");
+    }
+}
+
+public class PlotNamingTests
+{
+    [Fact] public void PatternFillsDrawingAndLayout() { Assert.Equal("Site-12-A1-Plan", PlotNaming.FileName("{drawing}-{layout}", "Site-12", "A1-Plan")); }
+    [Fact] public void BadCharactersBecomeUnderscore() { Assert.Equal("a_b_c", PlotNaming.FileName("{layout}", "d", "a/b:c")); }
+    [Fact] public void EmptyBecomesPlot() { Assert.Equal("plot", PlotNaming.FileName("{layout}", "d", "")); }
+    [Fact] public void UniqueNeverOverwrites()
+    {
+        var have = new HashSet<string> { System.IO.Path.Combine("f", "a.pdf"), System.IO.Path.Combine("f", "a-2.pdf") };
+        Assert.Equal(System.IO.Path.Combine("f", "a-3.pdf"), PlotNaming.Unique("f", "a", ".pdf", p => have.Contains(p)));
+        Assert.Equal(System.IO.Path.Combine("f", "b.pdf"), PlotNaming.Unique("f", "b", ".pdf", p => have.Contains(p)));
+    }
+    [Fact] public void ScaleParsing() { Assert.Equal(500, PlotNaming.ParseScale("1 : 500")); Assert.Equal(0, PlotNaming.ParseScale("Fit")); Assert.Equal(-1, PlotNaming.ParseScale("abc")); Assert.Equal(1000, PlotNaming.ParseScale("1000")); }
+    [Fact] public void ScaleInMetreDrawing() { Assert.Equal(0.5, PlotNaming.DrawingUnitsPerPaperMm(500, 1.0), 9); Assert.Equal(500.0, PlotNaming.DrawingUnitsPerPaperMm(500, 0.001), 6); }
+}
+
+namespace BPlus.LiveMap.Core.Tests2
+{
+    using System.Collections.Generic; using System.Linq; using Xunit; using BPlus.LiveMap.Core;
+    public class PointConvertTests
+    {
+        static SurveyPoint P(string no) { return new SurveyPoint { No = no }; }
+        [Fact] public void KeepsNumbersAndSkipsUsed()
+        {
+            var r = PointConvert.Plan(new[] { P("5"), P("6"), P("5") }, new[] { 6 }, false, 1001);
+            Assert.Equal(new[] { "ok", "used", "used" }, r.Select(x => x.Status).ToArray());
+        }
+        [Fact] public void GivesFreeNumbersWhenAsked()
+        {
+            var r = PointConvert.Plan(new[] { P(""), P("1001"), P("x") }, new int[0], true, 1001);
+            Assert.Equal(new[] { 1002, 1001, 1003 }, r.Select(x => x.Number).ToArray()); Assert.Equal("numbered", r[0].Status);
+        }
+        [Fact] public void NoNumberSkippedByDefault() { Assert.Equal("nonumber", PointConvert.Plan(new[] { P("") }, new int[0], false, 1).Single().Status); }
+    }
+}
