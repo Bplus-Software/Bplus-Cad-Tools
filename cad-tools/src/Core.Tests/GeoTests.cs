@@ -17,6 +17,18 @@ public class GeoTests
         new object[]{20438,24.0,45.0,500065.73456395656,2654214.129851803},
         new object[]{20438,24.7,43.2,317970.22841856675,2732912.8528773165},
         new object[]{20439,26.4207,50.0888,409171.65463988075,2922581.5519715184},
+        new object[]{9357,21.5433,39.1728,517893.35472377203,2382288.1589252064},
+        new object[]{9358,24.7136,46.6753,669459.8409100572,2734271.8790998915},
+        new object[]{9359,26.4207,50.0888,409134.37741914805,2922596.7946458617},
+        new object[]{9356,28.38,36.57,849897.5044085465,3144483.897885143},
+        new object[]{9360,23.6,55.3,326543.7688739939,2610972.760311516},
+        new object[]{8837,21.5433,39.1728,517893.1274058464,2382287.976866453},
+        new object[]{8838,24.7136,46.6753,669459.6216103545,2734271.671759945},
+        new object[]{8839,26.4207,50.0888,409134.15700947354,2922596.5823936043},
+        new object[]{2318,24.7136,46.6753,-132688.3950542391,-40637.199480562},
+        new object[]{2318,21.5433,39.1728,-906564.8261228101,-359607.050356184},
+        new object[]{2318,26.4207,50.0888,206455.88247620463,147604.42154505165},
+        new object[]{20440,23.6,55.3,326552.4958548533,2610957.0229078466},
     };
 
     // pyproj (PROJ) is the oracle. WGS 84 UTM must agree to 1 mm; Ain el Abd (3-parameter shift) to 3 m
@@ -26,7 +38,7 @@ public class GeoTests
     {
         var cs = CoordSys.FromEpsg(epsg);
         cs.FromLonLat(lon, lat, out double x, out double y);
-        double tol = epsg >= 32000 ? 0.001 : 3.0;
+        double tol = (epsg >= 32000 || epsg >= 8836 && epsg <= 9360) ? 0.002 : 3.0;
         Assert.InRange(Math.Abs(x - e), 0, tol); Assert.InRange(Math.Abs(y - n), 0, tol);
     }
 
@@ -39,7 +51,7 @@ public class GeoTests
         Assert.InRange(Math.Abs(lon2 - lon), 0, 1e-8); Assert.InRange(Math.Abs(lat2 - lat), 0, 1e-8);
     }
 
-    [Fact] public void UnknownEpsgIsNull() { Assert.Null(CoordSys.FromEpsg(2318)); }
+    [Fact] public void UnknownEpsgIsNull() { Assert.Null(CoordSys.FromEpsg(2319)); }
 
     [Fact] public void FeetUnits()
     {

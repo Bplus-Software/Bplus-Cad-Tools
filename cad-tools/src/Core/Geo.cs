@@ -8,9 +8,40 @@ namespace BPlus.LiveMap.Core
     {
         public readonly double A, F, E2;
         public Ellipsoid(double a, double invF) { A = a; F = 1.0 / invF; E2 = F * (2 - F); }
+        public static readonly Ellipsoid Grs80 = new Ellipsoid(6378137.0, 298.257222101);
         public static readonly Ellipsoid Wgs84 = new Ellipsoid(6378137.0, 298.257223563);
         public static readonly Ellipsoid International1924 = new Ellipsoid(6378388.0, 297.0);
         public static readonly Ellipsoid Helmert1906 = new Ellipsoid(6378200.0, 298.3);
+    }
+
+    /// <summary>Lambert Conformal Conic, 2 standard parallels (EPSG method 9802).</summary>
+    public sealed class LambertConic
+    {
+        readonly Ellipsoid _e; readonly double _lon0, _fe, _fn, _n, _F, _r0;
+        static double M(double e, double p) { double s = Math.Sin(p); return Math.Cos(p) / Math.Sqrt(1 - e * e * s * s); }
+        static double T(double e, double p) { double s = Math.Sin(p); return Math.Tan(Math.PI / 4 - p / 2) / Math.Pow((1 - e * s) / (1 + e * s), e / 2); }
+        public LambertConic(Ellipsoid el, double lat0Deg, double lon0Deg, double lat1Deg, double lat2Deg, double fe, double fn)
+        {
+            double d = Math.PI / 180; _e = el; double ee = Math.Sqrt(el.E2); _ee = ee;
+            double p0 = lat0Deg * d, p1 = lat1Deg * d, p2 = lat2Deg * d; _lon0 = lon0Deg * d; _fe = fe; _fn = fn;
+            double m1 = M(ee, p1), m2 = M(ee, p2), t0 = T(ee, p0), t1 = T(ee, p1), t2 = T(ee, p2);
+            _n = (Math.Log(m1) - Math.Log(m2)) / (Math.Log(t1) - Math.Log(t2));
+            _F = m1 / (_n * Math.Pow(t1, _n)); _r0 = el.A * _F * Math.Pow(t0, _n);
+        }
+        readonly double _ee;
+        public void Forward(double latDeg, double lonDeg, out double x, out double y)
+        {
+            double d = Math.PI / 180; double r = _e.A * _F * Math.Pow(T(_ee, latDeg * d), _n); double th = _n * (lonDeg * d - _lon0);
+            x = _fe + r * Math.Sin(th); y = _fn + _r0 - r * Math.Cos(th);
+        }
+        public void Inverse(double x, double y, out double latDeg, out double lonDeg)
+        {
+            double dx = x - _fe, dy = _r0 - (y - _fn); double r = Math.Sign(_n) * Math.Sqrt(dx * dx + dy * dy);
+            double th = Math.Atan2(Math.Sign(_n) * dx, Math.Sign(_n) * dy); double t = Math.Pow(r / (_e.A * _F), 1 / _n);
+            double p = Math.PI / 2 - 2 * Math.Atan(t);
+            for (int i = 0; i < 12; i++) { double s = Math.Sin(p); p = Math.PI / 2 - 2 * Math.Atan(t * Math.Pow((1 - _ee * s) / (1 + _ee * s), _ee / 2)); }
+            latDeg = p * 180 / Math.PI; lonDeg = (th / _n + _lon0) * 180 / Math.PI;
+        }
     }
 
     /// <summary>Transverse Mercator (Kruger series, 6th order), accurate to well under a millimetre inside a UTM zone.</summary>
@@ -107,10 +138,12 @@ namespace BPlus.LiveMap.Core
             latDeg = lat * 180 / Math.PI; lonDeg = Math.Atan2(y, x) * 180 / Math.PI;
         }
 
-        public static void Shift(Ellipsoid from, Ellipsoid to, double dx, double dy, double dz, double latDeg, double lonDeg, out double lat2, out double lon2)
+        public static void Shift(Ellipsoid from, Ellipsoid to, double dx, double dy, double dz, double latDeg, double lonDeg, out double lat2, out double lon2, double rx = 0, double ry = 0, double rz = 0)
         {
             double x, y, z; ToXyz(from, latDeg, lonDeg, 0, out x, out y, out z);
-            FromXyz(to, x + dx, y + dy, z + dz, out lat2, out lon2);
+            // Position-vector rotation (radians, small angles), as in EPSG method 1033.
+            double x2 = x - rz * y + ry * z, y2 = rz * x + y - rx * z, z2 = -ry * x + rx * y + z;
+            FromXyz(to, x2 + dx, y2 + dy, z2 + dz, out lat2, out lon2);
         }
     }
 
@@ -122,7 +155,7 @@ namespace BPlus.LiveMap.Core
         public bool IsGeographic { get; private set; }
         /// <summary>Metres per drawing unit.</summary>
         public double UnitToMetre { get; set; }
-        readonly TransverseMercator _tm; readonly bool _ainElAbd; readonly bool _webMerc; Ellipsoid _shiftEll; double _sx, _sy, _sz;
+        readonly TransverseMercator _tm; LambertConic _lcc; readonly bool _ainElAbd; readonly bool _webMerc; Ellipsoid _shiftEll; double _sx, _sy, _sz, _rx, _ry, _rz;
         public HashSet<string> Groups = new HashSet<string>(); public bool Unverified { get; private set; } public string Region { get; private set; }
 
         CoordSys(int epsg, string name, TransverseMercator tm, bool ain, bool geo, bool webMerc)
@@ -137,7 +170,19 @@ namespace BPlus.LiveMap.Core
             if (epsg == 3857) return new CoordSys(epsg, "WGS 84 / Pseudo-Mercator", null, false, false, true);
             if (epsg >= 32601 && epsg <= 32660) return Utm(epsg, epsg - 32600, true, Ellipsoid.Wgs84, false, "WGS 84 / UTM zone " + (epsg - 32600) + "N");
             if (epsg >= 32701 && epsg <= 32760) return Utm(epsg, epsg - 32700, false, Ellipsoid.Wgs84, false, "WGS 84 / UTM zone " + (epsg - 32700) + "S");
-            if (epsg >= 20435 && epsg <= 20439) { var a = Utm(epsg, epsg - 20400, true, Ellipsoid.International1924, true, "Ain el Abd / UTM zone " + (epsg - 20400) + "N"); a._shiftEll = Ellipsoid.International1924; a._sx = AinDx; a._sy = AinDy; a._sz = AinDz; return a; }
+            if (epsg == 2318)
+            {
+                var al = new CoordSys(epsg, "Ain el Abd / Aramco Lambert", null, true, false, false);
+                al._lcc = new LambertConic(Ellipsoid.International1924, 25.08951, 48, 17, 33, 0, 0);
+                al._shiftEll = Ellipsoid.International1924; al._sx = AinDx; al._sy = AinDy; al._sz = AinDz; return al;
+            }
+            if (epsg >= 9356 && epsg <= 9360)
+            {   // EPSG transformation 9383 (KSA-GRF17 to WGS 84): rotations only, -8.393, 0.749, -10.276 mas, accuracy 1 m.
+                var g = Utm(epsg, epsg - 9320, true, Ellipsoid.Grs80, true, "KSA-GRF17 / UTM zone " + (epsg - 9320) + "N");
+                double mas = Math.PI / 180 / 3600000; g._shiftEll = Ellipsoid.Grs80; g._rx = -8.393 * mas; g._ry = 0.749 * mas; g._rz = -10.276 * mas; return g;
+            }
+            if (epsg >= 8836 && epsg <= 8840) return Utm(epsg, epsg - 8800, true, Ellipsoid.Grs80, false, "MTRF-2000 / UTM zone " + (epsg - 8800) + "N");
+            if (epsg >= 20435 && epsg <= 20440) { var a = Utm(epsg, epsg - 20400, true, Ellipsoid.International1924, true, "Ain el Abd / UTM zone " + (epsg - 20400) + "N"); a._shiftEll = Ellipsoid.International1924; a._sx = AinDx; a._sy = AinDy; a._sz = AinDz; return a; }
             // Egypt 1907 belts: Transverse Mercator on the Helmert 1906 ellipsoid, shifted to WGS 84 with EPSG transformation 1148 (-130, 110, -13 m, accuracy about 11 m; the best published one is within about 5 m of it).
             if (epsg >= 22991 && epsg <= 22994)
             {
@@ -161,7 +206,10 @@ namespace BPlus.LiveMap.Core
             var l = new List<CoordSys>(); var have = new Dictionary<int, CoordSys>();
             Action<int, string, string> add = (code, grp, region) => { CoordSys c; if (!have.TryGetValue(code, out c)) { c = FromEpsg(code); if (c == null) return; c.Region = region; have[code] = c; l.Add(c); } c.Groups.Add(grp); };
             foreach (int c in new[] { 32638, 32637, 32639, 32636, 32640 }) add(c, "Saudi Arabia", "Saudi Arabia");
-            foreach (int c in new[] { 20437, 20438, 20439 }) add(c, "Saudi Arabia", "Saudi Arabia (old datum)");
+            foreach (int c in new[] { 9356, 9357, 9358, 9359, 9360 }) add(c, "Saudi Arabia", "KSA-GRF17 (national, GEOSA 2017)");
+            foreach (int c in new[] { 8836, 8837, 8838, 8839, 8840 }) add(c, "Saudi Arabia", "MTRF-2000 (MOMRA)");
+            foreach (int c in new[] { 20437, 20438, 20439, 20440 }) add(c, "Saudi Arabia", "NGN / Ain el Abd (old national network)");
+            add(2318, "Saudi Arabia", "Aramco Lambert (Ain el Abd)");
             foreach (int c in new[] { 32636, 32635 }) add(c, "Egypt", "Egypt");
             foreach (int c in new[] { 22992, 22993, 22994, 22991 }) add(c, "Egypt", c == 22991 ? "Egypt, Sinai" : "Egypt (old datum)");
             foreach (int c in new[] { 32638, 32639, 32640, 32637 }) add(c, "Gulf", "Kuwait, Qatar, UAE, Oman, Bahrain, Iraq (by zone)");
@@ -189,8 +237,8 @@ namespace BPlus.LiveMap.Core
                 const double R = 6378137.0;
                 lon = x / R * 180 / Math.PI; lat = (2 * Math.Atan(Math.Exp(y / R)) - Math.PI / 2) * 180 / Math.PI; return;
             }
-            double la, lo; _tm.Inverse(x, y, out la, out lo);
-            if (_ainElAbd) Datum.Shift(_shiftEll, Ellipsoid.Wgs84, _sx, _sy, _sz, la, lo, out la, out lo);
+            double la, lo; if (_lcc != null) _lcc.Inverse(x, y, out la, out lo); else _tm.Inverse(x, y, out la, out lo);
+            if (_ainElAbd) Datum.Shift(_shiftEll, Ellipsoid.Wgs84, _sx, _sy, _sz, la, lo, out la, out lo, _rx, _ry, _rz);
             lat = la; lon = lo;
         }
 
@@ -206,8 +254,8 @@ namespace BPlus.LiveMap.Core
             else
             {
                 double la = lat, lo = lon;
-                if (_ainElAbd) Datum.Shift(Ellipsoid.Wgs84, _shiftEll, -_sx, -_sy, -_sz, lat, lon, out la, out lo);
-                _tm.Forward(la, lo, out x, out y);
+                if (_ainElAbd) Datum.Shift(Ellipsoid.Wgs84, _shiftEll, -_sx, -_sy, -_sz, lat, lon, out la, out lo, -_rx, -_ry, -_rz);
+                if (_lcc != null) _lcc.Forward(la, lo, out x, out y); else _tm.Forward(la, lo, out x, out y);
             }
             x /= UnitToMetre; y /= UnitToMetre;
         }

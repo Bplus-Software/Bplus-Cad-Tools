@@ -51,6 +51,9 @@ namespace BPlus.LiveMap
                 grid.CellValueChanged += (s, e) => upd(); upd();
                 all.Click += (s, e) => { foreach (DataGridViewRow r in grid.Rows) r.Cells[0].Value = true; }; none.Click += (s, e) => { foreach (DataGridViewRow r in grid.Rows) r.Cells[0].Value = false; };
                 body.Controls.AddRange(new Control[] { all, none, grid, cnt });
+                // Size the list to its rows (small for few layouts, scrolls past 8) and move everything below it up or down.
+                grid.Columns[1].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill; grid.Columns[1].MinimumWidth = 120; grid.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+                int gh = 32 + Math.Min(Math.Max(rows.Count, 1), 8) * 26 + 4, dy = gh - grid.Height; grid.Height = gh; cnt.Top += dy;
 
                 body.Controls.Add(Theme.Lbl("Plot with", 16, 226, 300));
                 var pw = Group(body, 250, 54); var own = Rb("Each layout's own page setup", 20, 0, 600, false); var my = Rb("My settings (the same for all ticked layouts)", 20, 26, 600, true); pw.Controls.AddRange(new Control[] { own, my });
@@ -62,6 +65,8 @@ namespace BPlus.LiveMap
                 body.Controls.Add(Theme.Lbl("Drawing on paper", 426, 404, 210, true)); var rot = Cb(426, 426, 210); rot.Items.AddRange(new object[] { "As in the layout", "Turned 90\u00B0" }); rot.SelectedIndex = 0;
                 var lw = new CheckBox { Text = "Plot line weights", Left = 36, Top = 466, Width = 300, Height = 24, Checked = true, ForeColor = Theme.Text, BackColor = Color.Transparent };
                 body.Controls.AddRange(new Control[] { dev, med, sc, sty, rot, lw });
+                var msNote = Theme.Lbl("Microsoft Print to PDF: Windows may ask where to save each file. Choose the folder and click Save. One PDF per layout. It stops after 2 minutes.", 36, 512, 610, true); msNote.Height = 34; msNote.Visible = false; body.Controls.Add(msNote);
+                dev.TextChanged += (s, e) => msNote.Visible = dev.Text.IndexOf("microsoft", StringComparison.OrdinalIgnoreCase) >= 0;
                 body.Controls.Add(Theme.Lbl("A scale like 1:500 means 1 mm on paper = 500 mm of drawing.", 36, 494, 600, true));
 
                 body.Controls.Add(Theme.Lbl("Output", 16, 530, 300));
@@ -74,7 +79,8 @@ namespace BPlus.LiveMap
                 pat.TextChanged += (s, e) => exUpd(); one.CheckedChanged += (s, e) => exUpd();
                 body.Controls.AddRange(new Control[] { fold, br, pat, ex });
                 br.Click += (s, e) => { using (var d = new FolderBrowserDialog { SelectedPath = fold.Text }) if (d.ShowDialog(f) == DialogResult.OK) fold.Text = d.SelectedPath; };
-                body.AutoScrollMinSize = new Size(660, 736);
+                foreach (Control c in body.Controls) if (c != grid && c != cnt && c != all && c != none && c.Top >= 220) c.Top += dy;
+                body.AutoScrollMinSize = Size.Empty;
 
                 List<string[]> media = new List<string[]>();
                 Action fillMed = () =>
@@ -89,7 +95,9 @@ namespace BPlus.LiveMap
                 Action fillDev = () =>
                 {
                     var keep = dev.Text; dev.Items.Clear();
-                    foreach (var d in lists.Devices.Where(d => pdf.Checked ? d.IndexOf("pdf", StringComparison.OrdinalIgnoreCase) >= 0 : d.IndexOf("pdf", StringComparison.OrdinalIgnoreCase) < 0 && !d.Equals("None", StringComparison.OrdinalIgnoreCase))) dev.Items.Add(d);
+                    Func<string, bool> sys = d => { var u = d.ToLowerInvariant(); return u.Contains("microsoft") || u.Contains("xps") || u.Contains("onenote") || u.Contains("fax") || u.Contains("send to"); };
+                    // PDF files: AutoCAD PDF drivers first, plus the Windows Microsoft Print to PDF (not the default). Printer: real printers only.
+                    foreach (var d in lists.Devices.Where(d => pdf.Checked ? d.IndexOf("pdf", StringComparison.OrdinalIgnoreCase) >= 0 && (d.EndsWith(".pc3", StringComparison.OrdinalIgnoreCase) && !sys(d) || d.IndexOf("microsoft print to pdf", StringComparison.OrdinalIgnoreCase) >= 0) : d.IndexOf("pdf", StringComparison.OrdinalIgnoreCase) < 0 && !sys(d) && !d.Equals("None", StringComparison.OrdinalIgnoreCase) && !d.EndsWith(".pc3", StringComparison.OrdinalIgnoreCase))) dev.Items.Add(d);
                     int i = dev.Items.IndexOf(keep); if (i < 0) i = pdf.Checked ? Pick(dev, "DWG To PDF", "PDF") : (dev.Items.Count > 0 ? 0 : -1);
                     dev.SelectedIndex = i; fillMed(); exUpd();
                 };
@@ -114,9 +122,14 @@ namespace BPlus.LiveMap
                     f.DialogResult = DialogResult.OK;
                 };
                 cancel.Click += (s, e) => f.DialogResult = DialogResult.Cancel; f.AcceptButton = ok; f.CancelButton = cancel;
-                // Fit the screen: at most the working area, centred.
-                int w = Math.Min(f.Width, wa.Width - 20), h = Math.Min(f.Height, wa.Height - 20); f.Size = new Size(w, h);
-                f.Location = new Point(wa.Left + (wa.Width - w) / 2, wa.Top + (wa.Height - h) / 2);
+                // After the form is scaled for the screen's DPI, grow it to show all content (measured, not guessed), capped to the working area.
+                f.Load += (s, e) =>
+                {
+                    int bottom = 0, right = 0; foreach (Control c in body.Controls) { bottom = Math.Max(bottom, c.Bottom); right = Math.Max(right, c.Right); }
+                    int extraW = f.Width - f.ClientSize.Width, extraH = f.Height - f.ClientSize.Height;
+                    int w = Math.Min(right + 30 + extraW, wa.Width - 20), h = Math.Min(bottom + 16 + bar.Height + extraH, wa.Height - 20);
+                    f.Size = new Size(w, h); f.Location = new Point(wa.Left + (wa.Width - w) / 2, wa.Top + (wa.Height - h) / 2); place();
+                };
                 return AcApp.ShowModalDialog(f) == DialogResult.OK ? res : null;
             }
         }

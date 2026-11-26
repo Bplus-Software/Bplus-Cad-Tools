@@ -42,6 +42,43 @@ namespace BPlus.LiveMap
         }
     }
 
+    /// <summary>Microsoft Print to PDF opens its own Save As window. This watcher brings it to the front and closes it after the time limit so AutoCAD cannot hang for ever.</summary>
+    static class MsPdfWatch
+    {
+        [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool EnumWindows(EnumProc p, IntPtr l);
+        [System.Runtime.InteropServices.DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+        [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Auto)] static extern int GetClassName(IntPtr h, StringBuilder s, int n);
+        [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
+        [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);
+        [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool PostMessage(IntPtr h, uint m, IntPtr w, IntPtr l);
+        delegate bool EnumProc(IntPtr h, IntPtr l);
+        static volatile bool _run; static System.Threading.Thread _t;
+        public static void Start(int seconds)
+        {
+            Stop(); _run = true; uint me = (uint)System.Diagnostics.Process.GetCurrentProcess().Id; var t0 = DateTime.UtcNow;
+            _t = new System.Threading.Thread(() =>
+            {
+                while (_run)
+                {
+                    System.Threading.Thread.Sleep(700); double age = (DateTime.UtcNow - t0).TotalSeconds; bool kill = age > seconds;
+                    try
+                    {
+                        EnumWindows((h, l) =>
+                        {
+                            uint pid; GetWindowThreadProcessId(h, out pid); if (pid != me || !IsWindowVisible(h)) return true;
+                            var cls = new StringBuilder(64); GetClassName(h, cls, 64); if (cls.ToString() != "#32770") return true;
+                            if (kill) PostMessage(h, 0x0010, IntPtr.Zero, IntPtr.Zero); else SetForegroundWindow(h);
+                            return true;
+                        }, IntPtr.Zero);
+                    }
+                    catch { }
+                    if (kill) { Log.Write("Microsoft Print to PDF: stopped after " + seconds + " s"); _run = false; }
+                }
+            }) { IsBackground = true }; _t.Start();
+        }
+        public static void Stop() { _run = false; }
+    }
+
     public partial class Commands
     {
         const string PdfDevice = "DWG To PDF.pc3";
@@ -82,7 +119,9 @@ namespace BPlus.LiveMap
                     psv.SetPlotPaperUnits(ps, PlotPaperUnit.Millimeters); psv.SetPlotType(ps, Autodesk.AutoCAD.DatabaseServices.PlotType.Layout);
                     psv.SetPlotRotation(ps, ch.Rotation == 0 ? PlotRotation.Degrees000 : PlotRotation.Degrees090);
                     double ratio = PlotNaming.ParseScale(ch.Scale);
-                    if (ratio == 0) psv.SetStdScaleType(ps, StdScaleType.ScaleToFit);
+                    // A paper space layout is already laid out at paper size: "Fit" means 1:1 on the sheet. (Scale-to-fit on a Layout plot shrinks or stretches the sheet and cut the page edges.)
+                    psv.SetPlotCentered(ps, false); psv.SetPlotOrigin(ps, new Autodesk.AutoCAD.Geometry.Point2d(0, 0));
+                    if (ratio == 0) { psv.SetUseStandardScale(ps, true); psv.SetStdScaleType(ps, StdScaleType.StdScale1To1); }
                     else { psv.SetUseStandardScale(ps, false); psv.SetCustomPrintScale(ps, new CustomScale(1.0, PlotNaming.DrawingUnitsPerPaperMm(ratio, unit))); }
                     if (!string.IsNullOrEmpty(ch.Style)) psv.SetCurrentStyleSheet(ps, ch.Style);
                     ps.PrintLineweights = ch.Lineweights;
@@ -128,6 +167,9 @@ namespace BPlus.LiveMap
                 }
                 catch (System.Exception ex) { Log.Write("Plot save check: " + ex.Message); }
                 Log.Write("BPPLOT: layouts listed, reading printer lists"); var lists = PlotLists.Read(); Log.Write("BPPLOT: opening dialog"); var ch = PlotUi.Ask(rows, drawing, folder, lists); if (ch == null) return; Log.Write("BPPLOT: dialog OK, plotting " + ch.Layouts.Count + " layout(s)");
+                if (ch.Pdf && string.IsNullOrEmpty(ch.Device)) ch.Device = PdfDevice;
+                bool ms = ch.Pdf && ch.OwnSetup == false && ch.Device != null && ch.Device.IndexOf("microsoft", StringComparison.OrdinalIgnoreCase) >= 0; if (ms) ch.Combined = false;
+                if (ms) MsPdfWatch.Start(120);
                 if (ch.Pdf) { try { Directory.CreateDirectory(ch.Folder); } catch (System.Exception ex) { ed.WriteMessage("\n[B+] Cannot use that folder: " + ex.Message + "\n"); return; } }
 
                 var done = new List<string>(); var failed = new List<string>(); object oldBg = null; string oldLayout = null;
@@ -197,9 +239,12 @@ namespace BPlus.LiveMap
                 catch (System.Exception ex) { failed.Add("Plot stopped: " + ex.Message); }
                 finally
                 {
+                    MsPdfWatch.Stop();
                     try { if (oldLayout != null) LayoutManager.Current.CurrentLayout = oldLayout; } catch { }
                     try { if (oldBg != null) AcApp.SetSystemVariable("BACKGROUNDPLOT", oldBg); } catch { }
                 }
+                // A file that is missing or 0 bytes is a failure, not a success.
+                foreach (var d in done.ToList()) { if (!ch.Pdf) continue; string p = d.Contains("  (") ? d.Substring(0, d.IndexOf("  (")) : d; try { if (!File.Exists(p) || new FileInfo(p).Length == 0) { done.Remove(d); failed.Add(p + ": the file is missing or empty"); } } catch { } }
                 var sb = new StringBuilder(); sb.AppendLine(done.Count + " done, " + failed.Count + " failed."); foreach (var d in done) sb.AppendLine("  " + d); foreach (var x in failed) sb.AppendLine("  FAILED " + x);
                 ed.WriteMessage("\n[B+] " + sb.ToString().Replace("\r", ""));
                 System.Windows.Forms.MessageBox.Show(sb.ToString(), "B+ CAD Tools - Plot layouts");
