@@ -22,64 +22,85 @@ namespace BPlus.LiveMap
         static Panel Group(Panel body, int y, int h) { var p = new Panel { Left = 0, Top = y, Width = 680, Height = h, BackColor = Color.Transparent }; body.Controls.Add(p); return p; }
         static int Pick(ComboBox c, params string[] likes) { foreach (var l in likes) for (int i = 0; i < c.Items.Count; i++) if (c.Items[i].ToString().IndexOf(l, StringComparison.OrdinalIgnoreCase) >= 0) return i; return c.Items.Count > 0 ? 0 : -1; }
 
-        public static PlotChoice Ask(List<LayoutRow> rows, string drawing, string defFolder, PlotLists lists)
+        static Panel Card(Panel body, int y, int h, string title)
+        {
+            var p = new Panel { Left = 16, Top = y, Width = 668, Height = h, BackColor = Theme.Panel };
+            p.Controls.Add(new Label { Text = title, Left = 16, Top = 10, Width = 300, Height = 18, ForeColor = Theme.Dim, BackColor = Color.Transparent, Font = new Font("Segoe UI", 8.5f, FontStyle.Bold) });
+            body.Controls.Add(p); return p;
+        }
+        static Label Small(Panel p, string t, int x, int y, int w) { var l = Theme.Lbl(t, x, y, w, true); l.Height = 18; p.Controls.Add(l); return l; }
+
+        public static PlotChoice Ask(List<LayoutRow> rows, string drawing, string defFolder, PlotLists lists, bool arabic = false, bool oldAcad = false)
         {
             using (var f = Theme.Base("B+ CAD Tools - Plot layouts", 700, 700))
             {
-                // Scales with the screen's DPI, resizable, never taller than the screen. Buttons sit in a bar that is always visible.
+                // Three calm cards: Layouts, Page, Save as. Scales with the screen's DPI, sizes itself to its content (capped to the screen), buttons always visible.
                 f.AutoScaleDimensions = new SizeF(96f, 96f); f.AutoScaleMode = AutoScaleMode.Dpi;
                 f.FormBorderStyle = FormBorderStyle.Sizable; f.MaximizeBox = true; f.MinimumSize = new Size(560, 420);
                 var wa = Screen.FromControl(f).WorkingArea; f.StartPosition = FormStartPosition.Manual;
                 var bar = new Panel { Dock = DockStyle.Bottom, Height = 56, BackColor = Theme.Bar };
-                var body = new Panel { Dock = DockStyle.Fill, AutoScroll = true, BackColor = Theme.Bar }; body.AutoScrollMinSize = new Size(660, 730);
+                var body = new Panel { Dock = DockStyle.Fill, AutoScroll = true, BackColor = Theme.Bar };
                 f.Controls.Add(body); f.Controls.Add(bar); bar.BringToFront(); body.BringToFront();
-                bar.Dock = DockStyle.Bottom;
 
-                body.Controls.Add(Theme.Lbl("Layouts in this drawing", 16, 10, 300));
-                var all = new Label { Text = "All", Left = 500, Top = 10, Width = 40, Height = 22, ForeColor = Theme.Accent, BackColor = Color.Transparent, Cursor = Cursors.Hand };
-                var none = new Label { Text = "None", Left = 550, Top = 10, Width = 50, Height = 22, ForeColor = Theme.Accent, BackColor = Color.Transparent, Cursor = Cursors.Hand };
-                var grid = new DataGridView { Left = 16, Top = 36, Width = 628, Height = 150, AllowUserToAddRows = false, AllowUserToDeleteRows = false, AllowUserToResizeRows = false, RowHeadersVisible = false, SelectionMode = DataGridViewSelectionMode.FullRowSelect, BorderStyle = BorderStyle.None, BackgroundColor = Theme.Field, GridColor = Theme.Bar, EnableHeadersVisualStyles = false, ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing, ColumnHeadersHeight = 28, RowTemplate = { Height = 26 }, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None, MultiSelect = false };
-                grid.ColumnHeadersDefaultCellStyle.BackColor = Theme.Panel; grid.ColumnHeadersDefaultCellStyle.ForeColor = Theme.Text; grid.ColumnHeadersDefaultCellStyle.SelectionBackColor = Theme.Panel;
-                grid.DefaultCellStyle.BackColor = Theme.Field; grid.DefaultCellStyle.ForeColor = Theme.Text; grid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(48, 60, 78); grid.DefaultCellStyle.SelectionForeColor = Theme.Text;
-                grid.Columns.Add(new DataGridViewCheckBoxColumn { HeaderText = "", Width = 34 });
-                foreach (var c in new[] { new[] { "Layout", "190" }, new[] { "Page setup", "140" }, new[] { "Paper", "150" }, new[] { "Scale", "90" } }) grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = c[0], Width = int.Parse(c[1]), ReadOnly = true, SortMode = DataGridViewColumnSortMode.NotSortable });
-                grid.Columns[0].SortMode = DataGridViewColumnSortMode.NotSortable;
-                foreach (var r in rows) grid.Rows.Add(true, r.Name, r.Setup, r.Paper, r.Scale);
-                var cnt = Theme.Lbl("", 16, 192, 628, true);
-                Action upd = () => { int n = 0; foreach (DataGridViewRow r in grid.Rows) if (Convert.ToBoolean(r.Cells[0].Value)) n++; cnt.Text = n + " of " + rows.Count + " layouts ticked. The Model tab is not plotted by this tool."; };
-                grid.CurrentCellDirtyStateChanged += (s, e) => { if (grid.IsCurrentCellDirty) grid.CommitEdit(DataGridViewDataErrorContexts.Commit); };
-                grid.CellValueChanged += (s, e) => upd(); upd();
-                all.Click += (s, e) => { foreach (DataGridViewRow r in grid.Rows) r.Cells[0].Value = true; }; none.Click += (s, e) => { foreach (DataGridViewRow r in grid.Rows) r.Cells[0].Value = false; };
-                body.Controls.AddRange(new Control[] { all, none, grid, cnt });
-                // Size the list to its rows (small for few layouts, scrolls past 8) and move everything below it up or down.
-                grid.Columns[1].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill; grid.Columns[1].MinimumWidth = 120; grid.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-                int gh = 32 + Math.Min(Math.Max(rows.Count, 1), 8) * 26 + 4, dy = gh - grid.Height; grid.Height = gh; cnt.Top += dy;
+                // Card 1: layouts
+                int n = Math.Min(Math.Max(rows.Count, 1), 8), listH = n * 28 + 4;
+                var c1 = Card(body, 14, 30 + listH + 30, "LAYOUTS");
+                var all = new Label { Text = "All", Left = 540, Top = 10, Width = 40, Height = 18, ForeColor = Theme.Accent, BackColor = Color.Transparent, Cursor = Cursors.Hand };
+                var none = new Label { Text = "None", Left = 590, Top = 10, Width = 60, Height = 18, ForeColor = Theme.Accent, BackColor = Color.Transparent, Cursor = Cursors.Hand };
+                var list = new Panel { Left = 16, Top = 32, Width = 636, Height = listH, BackColor = Theme.Field, AutoScroll = true };
+                var checks = new List<CheckBox>();
+                for (int k = 0; k < rows.Count; k++)
+                {
+                    var r = rows[k];
+                    var cb = new CheckBox { Text = r.Name, Left = 10, Top = 4 + k * 28, Width = 400, Height = 24, Checked = true, ForeColor = Theme.Text, BackColor = Color.Transparent };
+                    var info = new Label { Text = (string.IsNullOrEmpty(r.Paper) ? "" : r.Paper) + (string.IsNullOrEmpty(r.Scale) ? "" : "   " + r.Scale), Left = 416, Top = 4 + k * 28, Width = 200, Height = 24, TextAlign = ContentAlignment.MiddleRight, ForeColor = Theme.Dim, BackColor = Color.Transparent };
+                    list.Controls.Add(cb); list.Controls.Add(info); checks.Add(cb);
+                }
+                var cnt = Small(c1, "", 16, 32 + listH + 6, 636);
+                Action upd = () => { int t = checks.Count(c => c.Checked); cnt.Text = t + " of " + rows.Count + " ticked. The Model tab is not plotted by this tool."; };
+                foreach (var cb in checks) cb.CheckedChanged += (s, e) => upd(); upd();
+                all.Click += (s, e) => { foreach (var c in checks) c.Checked = true; }; none.Click += (s, e) => { foreach (var c in checks) c.Checked = false; };
+                c1.Controls.AddRange(new Control[] { all, none, list });
 
-                body.Controls.Add(Theme.Lbl("Plot with", 16, 226, 300));
-                var pw = Group(body, 250, 54); var own = Rb("Each layout's own page setup", 20, 0, 600, false); var my = Rb("My settings (the same for all ticked layouts)", 20, 26, 600, true); pw.Controls.AddRange(new Control[] { own, my });
-                body.Controls.Add(Theme.Lbl("A layout with no printer or PDF set in its page setup uses my settings below.", 44, 308, 600, true));
-                body.Controls.Add(Theme.Lbl("Printer / PDF", 36, 340, 280, true)); var dev = Cb(36, 362, 290);
-                body.Controls.Add(Theme.Lbl("Paper size", 346, 340, 250, true)); var med = Cb(346, 362, 290);
-                body.Controls.Add(Theme.Lbl("Scale (Fit or 1:500)", 36, 404, 150, true)); var sc = new ComboBox { Left = 36, Top = 426, Width = 140, DropDownStyle = ComboBoxStyle.DropDown, FlatStyle = FlatStyle.Flat }; Theme.Style(sc); sc.Items.AddRange(new object[] { "Fit", "1:50", "1:100", "1:200", "1:250", "1:500", "1:1000", "1:2000", "1:5000" }); sc.Text = "Fit";
-                body.Controls.Add(Theme.Lbl("Plot style", 196, 404, 190, true)); var sty = Cb(196, 426, 210);
-                body.Controls.Add(Theme.Lbl("Drawing on paper", 426, 404, 210, true)); var rot = Cb(426, 426, 210); rot.Items.AddRange(new object[] { "As in the layout", "Turned 90\u00B0" }); rot.SelectedIndex = 0;
-                var lw = new CheckBox { Text = "Plot line weights", Left = 36, Top = 466, Width = 300, Height = 24, Checked = true, ForeColor = Theme.Text, BackColor = Color.Transparent };
-                body.Controls.AddRange(new Control[] { dev, med, sc, sty, rot, lw });
-                var msNote = Theme.Lbl("Microsoft Print to PDF: Windows may ask where to save each file. Choose the folder and click Save. One PDF per layout. It stops after 2 minutes.", 36, 512, 610, true); msNote.Height = 34; msNote.Visible = false; body.Controls.Add(msNote);
+                // Card 2: page
+                int y2 = 14 + c1.Height + 12;
+                var c2 = Card(body, y2, 266, "PAGE");
+                var pw = new Panel { Left = 16, Top = 30, Width = 636, Height = 26, BackColor = Color.Transparent }; c2.Controls.Add(pw);
+                var own = Rb("Each layout's own page setup", 0, 0, 300, false); var my = Rb("My settings (same for all ticked)", 310, 0, 320, true); pw.Controls.AddRange(new Control[] { own, my });
+                Small(c2, "Printer / PDF", 16, 64, 300); var dev = Cb(16, 84, 308); c2.Controls.Add(dev);
+                Small(c2, "Paper size", 340, 64, 300); var med = Cb(340, 84, 312); c2.Controls.Add(med);
+                Small(c2, "Scale (Fit or 1:500)", 16, 122, 140); var sc = new ComboBox { Left = 16, Top = 142, Width = 140, DropDownStyle = ComboBoxStyle.DropDown, FlatStyle = FlatStyle.Flat }; Theme.Style(sc); sc.Items.AddRange(new object[] { "Fit", "1:50", "1:100", "1:200", "1:250", "1:500", "1:1000" }); sc.Text = "Fit"; c2.Controls.Add(sc);
+                Small(c2, "Plot style", 172, 122, 220); var sty = Cb(172, 142, 230); c2.Controls.Add(sty);
+                Small(c2, "Drawing on paper", 418, 122, 230); var rot = Cb(418, 142, 234); rot.Items.AddRange(new object[] { "As in the layout", "Turned 90\u00B0" }); rot.SelectedIndex = 0; c2.Controls.Add(rot);
+                var lw = new CheckBox { Text = "Plot line weights", Left = 16, Top = 182, Width = 300, Height = 24, Checked = true, ForeColor = Theme.Text, BackColor = Color.Transparent }; c2.Controls.Add(lw);
+                Small(c2, "Fit plots the sheet at 1:1. A scale like 1:500 means 1 mm on paper = 500 mm of drawing.", 16, 212, 636);
+
+                var warn = Small(c2, "", 16, 236, 636); warn.ForeColor = Color.FromArgb(255, 190, 80); warn.Height = 18; warn.Visible = false;
+                Action warnUpd = () =>
+                {
+                    bool dwg = dev.Text.IndexOf("DWG To PDF", StringComparison.OrdinalIgnoreCase) >= 0;
+                    if (arabic && oldAcad && dwg) { warn.Text = "Arabic text found. On this AutoCAD version DWG To PDF can print Arabic letters separated. Try Microsoft Print to PDF."; warn.Visible = true; }
+                    else if (arabic && dev.Text.IndexOf("microsoft", StringComparison.OrdinalIgnoreCase) >= 0) { warn.Text = "Arabic text found: Microsoft Print to PDF chosen so the letters stay joined."; warn.ForeColor = Theme.Dim; warn.Visible = true; }
+                    else warn.Visible = false;
+                };
+                dev.TextChanged += (s, e) => warnUpd();
+
+                // Card 3: save as
+                int y3 = y2 + c2.Height + 12;
+                var c3 = Card(body, y3, 198, "SAVE AS");
+                var po = new Panel { Left = 16, Top = 30, Width = 636, Height = 26, BackColor = Color.Transparent }; c3.Controls.Add(po);
+                var pdf = Rb("PDF files", 0, 0, 140, true); var prn = Rb("Printer (as chosen above)", 150, 0, 300, false); po.Controls.AddRange(new Control[] { pdf, prn });
+                var pc = new Panel { Left = 16, Top = 58, Width = 636, Height = 26, BackColor = Color.Transparent }; c3.Controls.Add(pc);
+                var one = Rb("One PDF with all pages", 0, 0, 240, true); var sep = Rb("One PDF per layout", 250, 0, 240, false); pc.Controls.AddRange(new Control[] { one, sep });
+                Small(c3, "Folder", 16, 94, 80); var fold = new TextBox { Left = 100, Top = 90, Width = 440, Text = defFolder, BorderStyle = BorderStyle.FixedSingle }; Theme.Style(fold);
+                var br = Theme.Btn("Browse...", 552, 88, 100); c3.Controls.AddRange(new Control[] { fold, br });
+                Small(c3, "File name", 16, 126, 80); var pat = new TextBox { Left = 100, Top = 122, Width = 300, Text = "{drawing}-{layout}", BorderStyle = BorderStyle.FixedSingle }; Theme.Style(pat); c3.Controls.Add(pat);
+                var ex = Small(c3, "", 100, 150, 552);
+                var msNote = Small(c3, "Microsoft Print to PDF: Windows may ask where to save each file. Choose the folder and click Save. One PDF per layout. It stops after 2 minutes.", 16, 172, 636); msNote.Visible = false;
                 dev.TextChanged += (s, e) => msNote.Visible = dev.Text.IndexOf("microsoft", StringComparison.OrdinalIgnoreCase) >= 0;
-                body.Controls.Add(Theme.Lbl("A scale like 1:500 means 1 mm on paper = 500 mm of drawing.", 36, 494, 600, true));
-
-                body.Controls.Add(Theme.Lbl("Output", 16, 530, 300));
-                var po = Group(body, 554, 28); var pdf = Rb("PDF files", 20, 0, 140, true); var prn = Rb("Printer (as chosen above)", 170, 0, 300, false); po.Controls.AddRange(new Control[] { pdf, prn });
-                var pc = Group(body, 584, 28); var one = Rb("One PDF with all pages", 36, 0, 230, true); var sep = Rb("One PDF per layout", 280, 0, 230, false); pc.Controls.AddRange(new Control[] { one, sep });
-                body.Controls.Add(Theme.Lbl("Folder", 36, 620, 200, true)); var fold = new TextBox { Left = 36, Top = 642, Width = 480, Text = defFolder, BorderStyle = BorderStyle.FixedSingle }; Theme.Style(fold); var br = Theme.Btn("Browse...", 528, 640, 108);
-                body.Controls.Add(Theme.Lbl("File name", 36, 676, 90, true)); var pat = new TextBox { Left = 130, Top = 674, Width = 260, Text = "{drawing}-{layout}", BorderStyle = BorderStyle.FixedSingle }; Theme.Style(pat);
-                var ex = Theme.Lbl("", 36, 704, 600, true);
                 Action exUpd = () => ex.Text = pdf.Checked ? (one.Checked ? "File: " + PlotNaming.FileName("{drawing}", drawing, "") + ".pdf" : "e.g. " + PlotNaming.FileName(pat.Text, drawing, rows.Count > 0 ? rows[0].Name : "Layout1") + ".pdf") : "";
                 pat.TextChanged += (s, e) => exUpd(); one.CheckedChanged += (s, e) => exUpd();
-                body.Controls.AddRange(new Control[] { fold, br, pat, ex });
                 br.Click += (s, e) => { using (var d = new FolderBrowserDialog { SelectedPath = fold.Text }) if (d.ShowDialog(f) == DialogResult.OK) fold.Text = d.SelectedPath; };
-                foreach (Control c in body.Controls) if (c != grid && c != cnt && c != all && c != none && c.Top >= 220) c.Top += dy;
                 body.AutoScrollMinSize = Size.Empty;
 
                 List<string[]> media = new List<string[]>();
@@ -98,7 +119,7 @@ namespace BPlus.LiveMap
                     Func<string, bool> sys = d => { var u = d.ToLowerInvariant(); return u.Contains("microsoft") || u.Contains("xps") || u.Contains("onenote") || u.Contains("fax") || u.Contains("send to"); };
                     // PDF files: AutoCAD PDF drivers first, plus the Windows Microsoft Print to PDF (not the default). Printer: real printers only.
                     foreach (var d in lists.Devices.Where(d => pdf.Checked ? d.IndexOf("pdf", StringComparison.OrdinalIgnoreCase) >= 0 && (d.EndsWith(".pc3", StringComparison.OrdinalIgnoreCase) && !sys(d) || d.IndexOf("microsoft print to pdf", StringComparison.OrdinalIgnoreCase) >= 0) : d.IndexOf("pdf", StringComparison.OrdinalIgnoreCase) < 0 && !sys(d) && !d.Equals("None", StringComparison.OrdinalIgnoreCase) && !d.EndsWith(".pc3", StringComparison.OrdinalIgnoreCase))) dev.Items.Add(d);
-                    int i = dev.Items.IndexOf(keep); if (i < 0) i = pdf.Checked ? Pick(dev, "DWG To PDF", "PDF") : (dev.Items.Count > 0 ? 0 : -1);
+                    int i = dev.Items.IndexOf(keep); if (i < 0) i = pdf.Checked ? (arabic ? Pick(dev, "Microsoft Print To PDF", "DWG To PDF", "PDF") : Pick(dev, "DWG To PDF", "PDF")) : (dev.Items.Count > 0 ? 0 : -1);
                     dev.SelectedIndex = i; fillMed(); exUpd();
                 };
                 dev.SelectedIndexChanged += (s, e) => fillMed();
@@ -114,7 +135,7 @@ namespace BPlus.LiveMap
                 bar.Resize += (s, e) => place(); f.Load += (s, e) => place();
                 ok.Click += (s, e) =>
                 {
-                    var ticked = new List<string>(); foreach (DataGridViewRow r in grid.Rows) if (Convert.ToBoolean(r.Cells[0].Value)) ticked.Add(Convert.ToString(r.Cells[1].Value));
+                    var ticked = new List<string>(); for (int k = 0; k < checks.Count; k++) if (checks[k].Checked) ticked.Add(rows[k].Name);
                     if (ticked.Count == 0) { MessageBox.Show(f, "Tick at least one layout.", "B+ CAD Tools"); return; }
                     if (string.IsNullOrWhiteSpace(fold.Text) && pdf.Checked) { MessageBox.Show(f, "Choose a folder for the PDF files.", "B+ CAD Tools"); return; }
                     if (my.Checked) { if (dev.Text.Length == 0) { MessageBox.Show(f, "No printer or PDF device is available for this choice.", "B+ CAD Tools"); return; } if (PlotNaming.ParseScale(sc.Text) < 0) { MessageBox.Show(f, "Scale: type Fit or something like 1:500.", "B+ CAD Tools"); return; } }

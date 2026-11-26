@@ -32,12 +32,12 @@ namespace BPlus.LiveMap
                 foreach (var t in rc.Tabs) if (t.Id == TabId) return true;
                 var tab = new RibbonTab { Title = "B+ CAD Tools", Id = TabId };
                 AddStackPanel(tab, "Points", 3, L("Import points", "BPIMPORT ", "import", "Import a points file (txt, csv, xlsx) as points with codes and layers"), L("Show / hide", "BPISOLATE ", "layers", "Show or hide point categories"), L("Codes", "BPCODES ", "codes", "Edit the point code rules"), L("Connect points", "BPCONNECT ", "connect", "Draw lines through points by code and point number"), L("Vertices to points", "BPVERTS ", "verts", "Make a numbered point at every vertex"), L("Convert points", "BPCONVPTS ", "convpts", "Convert AutoCAD points to Civil 3D COGO points and back. Needs Civil 3D"), L("QA / QC", "BPQAQC ", "qa", "Check points: repeated numbers, duplicates, missing code or elevation, spikes"), L("Shift", "BPSHIFT ", "shift", "Move the selection by dE, dN, dZ"));
-                AddStackPanel(tab, "Live Map", 3, L("Live map", "BPGMAP ", "map", "Show or hide the live Google map behind the drawing"), L("Map options", "BPMAPOPT ", "gear", "Map type, opacity, refresh, coordinate system and Google key"), L("Coordinate system", "BPGMAPCS ", "cs", "Choose the coordinate system of the drawing: search by name, EPSG or country"));
+                AddStackPanel(tab, "Live Map", 3, L("Live map", "BPGMAP ", "map", "Show or hide the live Google map behind the drawing"), L("Map options", "BPMAPOPT ", "gear", "Map type, opacity, refresh, coordinate system and Google key"), L("Coordinate system", "BPGMAPCS ", "cs", "Choose the coordinate system of the drawing: search by name, EPSG or country"), L("Convert coordinates", "BPCONVCS ", "convcs", "Convert selected objects or a coordinate file from one coordinate system to another"));
                 AddStackPanel(tab, "Edit", 3, L("Join", "BPJOIN ", "join", "Join lines, polylines and arcs, closing small gaps"), L("Trim", "BPTRIM ", "trim", "Trim to a closed boundary: keep inside or outside"), L("Label", "BPLABEL ", "label", "Write length and area next to the selected polylines"), L("Auto leader", "BPLEADER ", "leader", "Select shapes: make a leader from each with its length or area"), L("Merge hatch", "BPHATCHMERGE ", "merge", "Combine several hatches into one"), L("Split hatch", "BPHATCHSPLIT ", "split", "Split a hatch into one hatch per separate area"));
                 AddStackPanel(tab, "Measure", 3, L("Area", "BPAREA ", "area", "Area of closed polylines in m2, with perimeter in m"), L("Distance", "BPDIST ", "dist", "Distance, azimuth and bearing between two points"), L("Chain length", "BPCHAIN ", "chain", "Length along many picked points, with each segment"), L("Area by points", "BPAREAPTS ", "areapts", "Area and perimeter of picked corners"), L("Angle", "BPANGLE ", "angle", "Angle between two lines, from three points"), L("Pick coordinates", "BPPICK ", "pickxy", "E, N, Z of picked points, with latitude and longitude when a coordinate system is set"));
                 AddStackPanel(tab, "Quantities", 3, L("Sinks", "BPSINKS ", "sinks", "Find where water collects on a surface: sinks with E, N, Z, depth, area and volume"), L("Cut and fill", "BPCUTFILL ", "cutfill", "Cut and fill volumes (m3) between the ground and another surface, a level or a plane"), L("Lengths", "BPLENGTHS ", "lengths", "List length and area of selected polylines, with table, CSV and labels"));
                 AddStackPanel(tab, "Output", 3, L("Plot layouts", "BPPLOT ", "plot", "Plot the layouts you tick: each layout's own page setup or your settings, to PDF or a printer"), L("Export points", "BPEXPORT ", "export", "Export points to a clean text or csv file"), L("Coordinates", "BPCOORD ", "coord", "Write E and N at points and vertices"));
-                AddStackPanel(tab, "Settings", 3, L("Settings", "BPSETTINGS ", "sliders", "Options, point defaults, updates"), L("Check updates", "BPUPDATE ", "update", "Check GitHub for a newer version and install it"), L("About", "BPABOUT ", "about", "Version and where settings are kept"));
+                AddStackPanel(tab, "Settings", 3, L("Settings", "BPSETTINGS ", "sliders", "Options, point defaults, updates"), L("Check updates", "BPUPDATE ", "update", "Check GitHub for a newer version and install it"), L("About", "BPABOUT ", "about", "Version and where settings are kept"), L("Clean drawing", "BPCLEAN ", "clean", "Remove empty layers, unused blocks and styles, zero-length objects (and duplicates if ticked) to make the file smaller. Saves a backup first"));
                 rc.Tabs.Add(tab);
                 Log.Write("Ribbon tab added.");
                 return true;
@@ -130,7 +130,17 @@ namespace BPlus.LiveMap
                 g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias; g.Clear(Color.Transparent);
                 float s = size / 32f; var white = new Pen(Color.FromArgb(235, 238, 242), 2f * s);
                 Func<float, float> k = v => v * s;
-                if (kind == "map")
+                if (kind == "clean")
+                {
+                    g.DrawRectangle(white, k(5), k(6), k(18), k(20)); g.DrawLine(white, k(9), k(12), k(19), k(12)); g.DrawLine(white, k(9), k(17), k(19), k(17)); g.DrawLine(white, k(9), k(22), k(15), k(22));
+                    g.DrawLine(white, k(20), k(28), k(29), k(5)); g.DrawLine(white, k(24), k(28), k(29), k(16));
+                }
+                else if (kind == "convcs")
+                {
+                    g.DrawRectangle(white, k(4), k(6), k(11), k(11)); g.DrawRectangle(white, k(17), k(17), k(11), k(11));
+                    g.DrawLine(white, k(16), k(9), k(26), k(9)); g.DrawLine(white, k(26), k(9), k(26), k(15)); g.DrawLine(white, k(26), k(15), k(23), k(12)); g.DrawLine(white, k(26), k(15), k(29), k(12));
+                }
+                else if (kind == "map")
                 {
                     var pts = new[] { new PointF(4 * s, 8 * s), new PointF(12 * s, 5 * s), new PointF(20 * s, 8 * s), new PointF(28 * s, 5 * s), new PointF(28 * s, 24 * s), new PointF(20 * s, 27 * s), new PointF(12 * s, 24 * s), new PointF(4 * s, 27 * s) };
                     g.DrawPolygon(white, pts); g.DrawLine(white, 12 * s, 5 * s, 12 * s, 24 * s); g.DrawLine(white, 20 * s, 8 * s, 20 * s, 27 * s);

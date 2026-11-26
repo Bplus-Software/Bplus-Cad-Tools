@@ -127,4 +127,20 @@ public class GoogleParseTests
         Assert.Contains("layerRoadmap", GoogleTiles.SessionBody(MapKind.Hybrid));
         Assert.Contains("roadmap", GoogleTiles.SessionBody(MapKind.Roadmap));
     }
+
+    [Fact] public void ConvertUtmToUtmAndBack()
+    {
+        var a = CoordSys.FromEpsg(32638); var b = CoordSys.FromEpsg(32637);
+        double x2, y2, x3, y3; CoordConvert.Point(a, b, 669459.6216, 2734271.6719, out x2, out y2); CoordConvert.Point(b, a, x2, y2, out x3, out y3);
+        Assert.InRange(Math.Abs(x3 - 669459.6216), 0, 0.001); Assert.InRange(Math.Abs(y3 - 2734271.6719), 0, 0.001);
+        Assert.InRange(Math.Abs(x2 - 669459.6216), 1000, 1e9);
+    }
+
+    [Fact] public void ConvertTextKeepsHeaderAndOtherColumns()
+    {
+        var a = CoordSys.FromEpsg(32638); var b = CoordSys.FromEpsg(4326); int c, s;
+        string o = CoordConvert.ConvertText("No,E,N,Z,Code\r\n1,669459.622,2734271.672,612.5,TP\r\n", a, b, 2, 3, out c, out s);
+        Assert.Equal(1, c); Assert.Equal(1, s); var l = o.Split('\n'); Assert.StartsWith("No,E,N,Z,Code", l[0]); Assert.StartsWith("1,46.67", l[1]); Assert.EndsWith(",612.5,TP", l[1].TrimEnd('\r'));
+        int e, n; CoordConvert.GuessColumns("1,669459.622,2734271.672,612.5,TP", out e, out n); Assert.Equal(2, e); Assert.Equal(3, n);
+    }
 }

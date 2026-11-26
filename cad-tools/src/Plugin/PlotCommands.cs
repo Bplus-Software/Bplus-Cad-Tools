@@ -138,6 +138,38 @@ namespace BPlus.LiveMap
             return pi;
         }
 
+        /// <summary>True when the drawing has text with Arabic letters (text, mtext, attributes in any space). Stops at the first hit or after 300,000 objects.</summary>
+        static bool HasArabic(Database db)
+        {
+            try
+            {
+                int seen = 0;
+                using (var tr = db.TransactionManager.StartOpenCloseTransaction())
+                {
+                    var bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
+                    foreach (ObjectId id in bt)
+                    {
+                        var btr = (BlockTableRecord)tr.GetObject(id, OpenMode.ForRead);
+                        if (btr.IsFromExternalReference || btr.IsDependent) continue;
+                        foreach (ObjectId eid in btr)
+                        {
+                            if (++seen > 300000) return false;
+                            string txt = null; var cls = eid.ObjectClass.DxfName;
+                            if (cls == "TEXT" || cls == "MTEXT" || cls == "ATTDEF" || cls == "INSERT" || cls == "ATTRIB")
+                            {
+                                var o = tr.GetObject(eid, OpenMode.ForRead);
+                                if (o is DBText) txt = ((DBText)o).TextString; else if (o is MText) txt = ((MText)o).Contents;
+                                else if (o is BlockReference) { foreach (ObjectId a in ((BlockReference)o).AttributeCollection) { var at = tr.GetObject(a, OpenMode.ForRead) as AttributeReference; if (at != null && at.TextString != null && at.TextString.Any(ch => ch >= 0x0600 && ch <= 0x06FF)) return true; } }
+                            }
+                            if (txt != null && txt.Any(ch => ch >= 0x0600 && ch <= 0x06FF)) return true;
+                        }
+                    }
+                }
+            }
+            catch (System.Exception ex) { Log.Write("Arabic scan: " + ex.Message); }
+            return false;
+        }
+
         [CommandMethod("BPPLOT")]
         public static void PlotLayouts()
         {
@@ -166,7 +198,7 @@ namespace BPlus.LiveMap
                     }
                 }
                 catch (System.Exception ex) { Log.Write("Plot save check: " + ex.Message); }
-                Log.Write("BPPLOT: layouts listed, reading printer lists"); var lists = PlotLists.Read(); Log.Write("BPPLOT: opening dialog"); var ch = PlotUi.Ask(rows, drawing, folder, lists); if (ch == null) return; Log.Write("BPPLOT: dialog OK, plotting " + ch.Layouts.Count + " layout(s)");
+                Log.Write("BPPLOT: layouts listed, reading printer lists"); var lists = PlotLists.Read(); Log.Write("BPPLOT: opening dialog"); bool arabic = HasArabic(db); bool oldAcad = true; try { oldAcad = AcApp.Version < new Version(24, 3); } catch { } Log.Write("BPPLOT: arabic text " + arabic + ", old AutoCAD " + oldAcad); var ch = PlotUi.Ask(rows, drawing, folder, lists, arabic, oldAcad); if (ch == null) return; Log.Write("BPPLOT: dialog OK, plotting " + ch.Layouts.Count + " layout(s)");
                 if (ch.Pdf && string.IsNullOrEmpty(ch.Device)) ch.Device = PdfDevice;
                 bool ms = ch.Pdf && ch.OwnSetup == false && ch.Device != null && ch.Device.IndexOf("microsoft", StringComparison.OrdinalIgnoreCase) >= 0; if (ms) ch.Combined = false;
                 if (ms) MsPdfWatch.Start(120);
