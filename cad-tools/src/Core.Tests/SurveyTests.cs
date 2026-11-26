@@ -309,3 +309,12 @@ namespace BPlus.LiveMap.Core.Tests2
         [Fact] public void NoNumberSkippedByDefault() { Assert.Equal("nonumber", PointConvert.Plan(new[] { P("") }, new int[0], false, 1).Single().Status); }
     }
 }
+
+namespace BPlus.LiveMap.Core.Tests3
+{
+    using Xunit; using BPlus.LiveMap.Core;
+    public class VersionOrderTests
+    {
+        [Fact] public void TenIsNewerThanNine() { Assert.True(Updater.ParseVersion("0.4.10") > Updater.ParseVersion("0.4.9")); }
+    }
+}

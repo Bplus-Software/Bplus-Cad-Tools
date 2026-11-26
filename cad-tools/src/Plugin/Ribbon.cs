@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Windows.Media.Imaging;
@@ -30,26 +31,50 @@ namespace BPlus.LiveMap
                 var rc = ComponentManager.Ribbon; if (rc == null) return false;
                 foreach (var t in rc.Tabs) if (t.Id == TabId) return true;
                 var tab = new RibbonTab { Title = "B+ CAD Tools", Id = TabId };
-                AddPanel(tab, "Points", L("Import\npoints", "BPIMPORT ", "import", "Import a points file (txt, csv, xlsx) as points with codes and layers"), L("Export\npoints", "BPEXPORT ", "export", "Export points to a clean text or csv file"), L("Show / hide", "BPISOLATE ", "layers", "Show or hide point categories"), L("Codes", "BPCODES ", "codes", "Edit the point code rules"));
-                AddPanel(tab, "Draw", L("Connect\npoints", "BPCONNECT ", "connect", "Draw lines through points by code and point number"));
-                AddPanel(tab, "Polylines", L("Lengths", "BPLENGTHS ", "lengths", "List length and area of selected polylines, with table, CSV and labels"), L("Join", "BPJOIN ", "join", "Join lines, polylines and arcs, closing small gaps"), L("Trim", "BPTRIM ", "trim", "Trim to a closed boundary: keep inside or outside"), L("Label", "BPLABEL ", "label", "Write length and area next to the selected polylines"), L("Auto\nleader", "BPLEADER ", "leader", "Select shapes: make a leader from each with its length or area"), L("Vertices to\npoints", "BPVERTS ", "verts", "Make a numbered point at every vertex"), L("Coordinates", "BPCOORD ", "coord", "Write E and N at points and vertices"));
-                AddPanel(tab, "Hatch", L("Merge", "BPHATCHMERGE ", "merge", "Combine several hatches into one"), L("Split", "BPHATCHSPLIT ", "split", "Split a hatch into one hatch per separate area"));
-                AddPanel(tab, "Survey QA", L("QA / QC", "BPQAQC ", "qa", "Check points: repeated numbers, duplicates, missing code or elevation, spikes"), L("Shift", "BPSHIFT ", "shift", "Move the selection by dE, dN, dZ"), L("Convert\npoints", "BPCONVPTS ", "convpts", "Convert AutoCAD points to Civil 3D COGO points and back. Needs Civil 3D"));
-                AddPanel(tab, "Plot", L("Plot\nlayouts", "BPPLOT ", "plot", "Plot the layouts you tick: each layout's own page setup or your settings, to PDF or a printer"));
-                AddPanel(tab, "Measure", L("Area", "BPAREA ", "area", "Area of closed polylines in m2, with perimeter in m"), L("Distance", "BPDIST ", "dist", "Distance, azimuth and bearing between two points"), L("Chain\nlength", "BPCHAIN ", "chain", "Length along many picked points, with each segment"), L("Area by\npoints", "BPAREAPTS ", "areapts", "Area and perimeter of picked corners"), L("Angle", "BPANGLE ", "angle", "Angle between two lines, from three points"), L("Pick\ncoordinates", "BPPICK ", "pickxy", "E, N, Z of picked points, with latitude and longitude when a coordinate system is set"));
-                AddPanel(tab, "Quantities", L("Sinks", "BPSINKS ", "sinks", "Find where water collects on a surface: sinks with E, N, Z, depth, area and volume"), L("Cut and\nfill", "BPCUTFILL ", "cutfill", "Cut and fill volumes (m3) between the ground and another surface, a level or a plane"));
-                var src = new RibbonPanelSource { Title = "Live Map" };
-                var panel = new RibbonPanel { Source = src };
-                var main = new RibbonButton { Text = "Live\nmap", ShowText = true, ShowImage = true, Size = RibbonItemSize.Large, Orientation = System.Windows.Controls.Orientation.Vertical, LargeImage = Icon(32, "map"), Image = Icon(16, "map"), CommandHandler = new Cmd("BPGMAP "), CommandParameter = "BPGMAP ", ToolTip = "Show or hide the live Google map behind the drawing" };
-                src.Items.Add(main);
-                src.Items.Add(new RibbonButton { Text = "Map\noptions", ShowText = true, ShowImage = true, Size = RibbonItemSize.Large, Orientation = System.Windows.Controls.Orientation.Vertical, LargeImage = Icon(32, "gear"), Image = Icon(16, "gear"), CommandHandler = new Cmd("BPMAPOPT "), ToolTip = "Map type, opacity, refresh, coordinate system and Google key" });
-                tab.Panels.Add(panel);
-                AddPanel(tab, "Settings", L("Coordinate\nsystem", "BPGMAPCS ", "cs", "Choose the coordinate system of the drawing: search by name, EPSG or country"), L("Settings", "BPSETTINGS ", "gear", "Options, point defaults, updates"), L("Check\nupdates", "BPUPDATE ", "update", "Check GitHub for a newer version and install it"), L("About", "BPABOUT ", "about", "Version and where settings are kept"));
+                AddPanel(tab, "Points", L("Import\npoints", "BPIMPORT ", "import", "Import a points file (txt, csv, xlsx) as points with codes and layers"), L("Export\npoints", "BPEXPORT ", "export", "Export points to a clean text or csv file"));
+                AddStack(tab.Panels[tab.Panels.Count - 1].Source, 3, L("Show / hide", "BPISOLATE ", "layers", "Show or hide point categories"), L("Codes", "BPCODES ", "codes", "Edit the point code rules"));
+                AddMapPanel(tab, L("Coordinate\nsystem", "BPGMAPCS ", "cs", "Choose the coordinate system of the drawing: search by name, EPSG or country"), L("Settings", "BPSETTINGS ", "gear", "Options, point defaults, updates"), L("Check\nupdates", "BPUPDATE ", "update", "Check GitHub for a newer version and install it"), L("About", "BPABOUT ", "about", "Version and where settings are kept"));
+                AddStackPanel(tab, "Draw / Polylines", 3, L("Connect\npoints", "BPCONNECT ", "connect", "Draw lines through points by code and point number"), L("Lengths", "BPLENGTHS ", "lengths", "List length and area of selected polylines, with table, CSV and labels"), L("Join", "BPJOIN ", "join", "Join lines, polylines and arcs, closing small gaps"), L("Trim", "BPTRIM ", "trim", "Trim to a closed boundary: keep inside or outside"), L("Label", "BPLABEL ", "label", "Write length and area next to the selected polylines"), L("Auto\nleader", "BPLEADER ", "leader", "Select shapes: make a leader from each with its length or area"), L("Vertices to\npoints", "BPVERTS ", "verts", "Make a numbered point at every vertex"), L("Coordinates", "BPCOORD ", "coord", "Write E and N at points and vertices"));
+                AddStackPanel(tab, "Hatch", 2, L("Merge", "BPHATCHMERGE ", "merge", "Combine several hatches into one"), L("Split", "BPHATCHSPLIT ", "split", "Split a hatch into one hatch per separate area"));
+                AddStackPanel(tab, "QA / Plot", 2, L("QA / QC", "BPQAQC ", "qa", "Check points: repeated numbers, duplicates, missing code or elevation, spikes"), L("Shift", "BPSHIFT ", "shift", "Move the selection by dE, dN, dZ"), L("Convert\npoints", "BPCONVPTS ", "convpts", "Convert AutoCAD points to Civil 3D COGO points and back. Needs Civil 3D"), L("Plot\nlayouts", "BPPLOT ", "plot", "Plot the layouts you tick: each layout's own page setup or your settings, to PDF or a printer"));
+                AddStackPanel(tab, "Measure", 3, L("Area", "BPAREA ", "area", "Area of closed polylines in m2, with perimeter in m"), L("Distance", "BPDIST ", "dist", "Distance, azimuth and bearing between two points"), L("Chain\nlength", "BPCHAIN ", "chain", "Length along many picked points, with each segment"), L("Area by\npoints", "BPAREAPTS ", "areapts", "Area and perimeter of picked corners"), L("Angle", "BPANGLE ", "angle", "Angle between two lines, from three points"), L("Pick\ncoordinates", "BPPICK ", "pickxy", "E, N, Z of picked points, with latitude and longitude when a coordinate system is set"));
+                AddStackPanel(tab, "Quantities", 2, L("Sinks", "BPSINKS ", "sinks", "Find where water collects on a surface: sinks with E, N, Z, depth, area and volume"), L("Cut and\nfill", "BPCUTFILL ", "cutfill", "Cut and fill volumes (m3) between the ground and another surface, a level or a plane"));
                 rc.Tabs.Add(tab);
                 Log.Write("Ribbon tab added.");
                 return true;
             }
             catch (Exception e) { Log.Write("Ribbon failed: " + e.Message); return false; }
+        }
+
+
+        static RibbonButton Small(string[] b)
+        {
+            return new RibbonButton { Text = b[0].Replace("\n", " "), ShowText = true, ShowImage = true, Size = RibbonItemSize.Standard, Orientation = System.Windows.Controls.Orientation.Horizontal, Image = Icon(16, b[2]), LargeImage = Icon(32, b[2]), CommandHandler = new Cmd(b[1]), CommandParameter = b[1], ToolTip = b[3] };
+        }
+        /// <summary>Small buttons stacked in columns of up to 'rows' (plain buttons, no dropdowns), so the tab stays short.</summary>
+        static void AddStack(RibbonPanelSource src, int rows, params string[][] btns)
+        {
+            var rp = new RibbonRowPanel();
+            for (int r = 0; r < rows; r++)
+            {
+                bool any = false;
+                for (int i = r; i < btns.Length; i += rows) { rp.Items.Add(Small(btns[i])); any = true; }
+                if (any && r < rows - 1 && r + 1 < btns.Length) rp.Items.Add(new RibbonRowBreak());
+            }
+            src.Items.Add(rp);
+        }
+        static void AddStackPanel(RibbonTab tab, string title, int rows, params string[][] btns)
+        {
+            var src = new RibbonPanelSource { Title = title }; AddStack(src, rows, btns); tab.Panels.Add(new RibbonPanel { Source = src });
+        }
+        /// <summary>Live map (large) with the settings buttons stacked beside it. Placed early so it is never the part that is cut off.</summary>
+        static void AddMapPanel(RibbonTab tab, params string[][] settings)
+        {
+            var src = new RibbonPanelSource { Title = "Map & settings" };
+            src.Items.Add(new RibbonButton { Text = "Live\nmap", ShowText = true, ShowImage = true, Size = RibbonItemSize.Large, Orientation = System.Windows.Controls.Orientation.Vertical, LargeImage = Icon(32, "map"), Image = Icon(16, "map"), CommandHandler = new Cmd("BPGMAP "), CommandParameter = "BPGMAP ", ToolTip = "Show or hide the live Google map behind the drawing" });
+            var all = new List<string[]> { L("Map options", "BPMAPOPT ", "gear", "Map type, opacity, refresh, coordinate system and Google key") }; all.AddRange(settings);
+            AddStack(src, 3, all.ToArray());
+            tab.Panels.Add(new RibbonPanel { Source = src });
         }
 
         static string[] L(string text, string cmd, string icon, string tip) { return new[] { text, cmd, icon, tip }; }
