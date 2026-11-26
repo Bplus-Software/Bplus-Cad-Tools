@@ -14,7 +14,7 @@ namespace BPlus.LiveMap
 {
     public class App : IExtensionApplication
     {
-        public static string Version = "0.3.0-experimental";
+        public static string Version = "0.3.1-experimental";
         public void Initialize()
         {
             try
@@ -23,7 +23,7 @@ namespace BPlus.LiveMap
                 Engine.Init();
                 Ribbon.Install();
                 var ed = AcApp.DocumentManager.MdiActiveDocument?.Editor;
-                if (ed != null) ed.WriteMessage("\nBPlus Live Map " + Version + " loaded. Use the BPlus tab, or type BPGMAP.\n");
+                if (ed != null) ed.WriteMessage("\nB+ CAD Tools " + Version + " loaded. Use the B+ CAD Tools tab.\n");
             }
             catch (Exception e) { Log.Write("Startup failed: " + e); Commands.LastError = e.Message; }
         }
@@ -119,7 +119,7 @@ namespace BPlus.LiveMap
                 var doc = Doc; var ed = doc.Editor;
                 var p = Engine.ProviderFor(doc) ?? DrawingCs.Get(doc.Database);
                 string prob; Engine.ReadView(doc, out prob);
-                ed.WriteMessage("\n--- BPlus Live Map check ---");
+                ed.WriteMessage("\n--- B+ CAD Tools check ---");
                 ed.WriteMessage("\nPlugin version : " + App.Version);
                 ed.WriteMessage("\nAutoCAD        : " + AcApp.Version);
                 ed.WriteMessage("\nRuntime        : " + System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription);

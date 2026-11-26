@@ -7,8 +7,24 @@ namespace BPlus.LiveMap.Setup
 {
     public static class InstallLogic
     {
-        public const string BundleName = "BPlusLiveMap.bundle";
+        public const string BundleName = "BPlusCadTools.bundle", LegacyBundleName = "BPlusLiveMap.bundle";
         public static string DefaultTarget() { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Autodesk", "ApplicationPlugins", BundleName); }
+
+        public static string LegacyTarget() { return Path.Combine(Path.GetDirectoryName(DefaultTarget()), LegacyBundleName); }
+
+        // Version 0.1.0 to 0.3.0 used the bundle name BPlusLiveMap.bundle. Two bundles would load the same commands twice, so the old one is removed.
+        // Moving the folder first fails cleanly (nothing is lost) when AutoCAD still has the old DLL open.
+        public static bool RemoveLegacy(string legacy, Action<string> log)
+        {
+            if (!Directory.Exists(legacy)) return false;
+            string gone = legacy + ".removed";
+            if (Directory.Exists(gone)) { try { Directory.Delete(gone, true); } catch { } }
+            try { Directory.Move(legacy, gone); }
+            catch (Exception e) { throw new InvalidOperationException("The old BPlus Live Map install is in use. Close AutoCAD and Civil 3D, then run the installer again. (" + e.Message + ")"); }
+            log("Moved old bundle " + legacy);
+            try { Directory.Delete(gone, true); } catch (Exception e) { log("Could not delete " + gone + ": " + e.Message); }
+            return true;
+        }
 
         public static void Validate(string dir)
         {

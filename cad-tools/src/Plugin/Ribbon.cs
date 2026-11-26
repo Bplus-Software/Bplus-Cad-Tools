@@ -10,7 +10,7 @@ namespace BPlus.LiveMap
 {
     static class Ribbon
     {
-        const string TabId = "BPLUS_LIVEMAP_TAB";
+        const string TabId = "BPLUS_CADTOOLS_TAB";
         static bool _hooked;
         public static void Install()
         {
@@ -29,7 +29,7 @@ namespace BPlus.LiveMap
             {
                 var rc = ComponentManager.Ribbon; if (rc == null) return false;
                 foreach (var t in rc.Tabs) if (t.Id == TabId) return true;
-                var tab = new RibbonTab { Title = "BPlus", Id = TabId };
+                var tab = new RibbonTab { Title = "B+ CAD Tools", Id = TabId };
                 AddPanel(tab, "Points", L("Import points", "BPIMPORT ", "import", "Import a points file (txt, csv, xlsx) as points with codes and layers"), L("Export points", "BPEXPORT ", "export", "Export points to a clean text or csv file"), L("Show / hide", "BPISOLATE ", "layers", "Show or hide point categories"), L("Codes", "BPCODES ", "codes", "Edit the point code rules"));
                 AddPanel(tab, "Draw", L("Connect points", "BPCONNECT ", "connect", "Draw lines through points by code and point number"));
                 AddPanel(tab, "Survey QA", L("QA / QC", "BPQAQC ", "qa", "Check points: repeated numbers, duplicates, missing code or elevation, spikes"), L("Shift", "BPSHIFT ", "shift", "Move the selection by dE, dN, dZ"));

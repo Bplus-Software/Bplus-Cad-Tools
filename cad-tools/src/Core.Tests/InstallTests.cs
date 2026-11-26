@@ -18,7 +18,7 @@ public class InstallTests
         ms.Position = 0; return ms;
     }
     static void Put(ZipArchive z, string n, string c) { var e = z.CreateEntry(n); using (var w = new StreamWriter(e.Open())) w.Write(c); }
-    static string Tmp() { return Path.Combine(Path.GetTempPath(), "bpt" + Guid.NewGuid().ToString("N"), "BPlusLiveMap.bundle"); }
+    static string Tmp() { return Path.Combine(Path.GetTempPath(), "bpt" + Guid.NewGuid().ToString("N"), "BPlusCadTools.bundle"); }
 
     [Fact] public void FreshInstallAndUninstall()
     {
@@ -44,6 +44,14 @@ public class InstallTests
         var t = Tmp(); Assert.Throws<InvalidOperationException>(() => Install(Zip(true, true), t));
         Assert.False(File.Exists(Path.Combine(Path.GetDirectoryName(t), "evil.txt")));
     }
+    [Fact] public void LegacyBundleIsRemovedBeforeInstall()
+    {
+        var t = Tmp(); var legacy = Path.Combine(Path.GetDirectoryName(t), "BPlusLiveMap.bundle"); Directory.CreateDirectory(legacy); File.WriteAllText(Path.Combine(legacy, "x.txt"), "old");
+        Assert.True(InstallLogic.RemoveLegacy(legacy, x => { })); Assert.False(Directory.Exists(legacy)); Assert.False(Directory.Exists(legacy + ".removed"));
+        Install(Zip(true), t); Assert.True(Directory.Exists(t));
+        Assert.False(InstallLogic.RemoveLegacy(legacy, x => { }));
+    }
+    [Fact] public void NewBundleNameDiffersFromLegacy() { Assert.Equal("BPlusCadTools.bundle", InstallLogic.BundleName); Assert.EndsWith("BPlusLiveMap.bundle", InstallLogic.LegacyTarget()); }
     static void Install(Stream s, string t) { InstallLogic.Install(s, t, x => { }); }
 }
 
