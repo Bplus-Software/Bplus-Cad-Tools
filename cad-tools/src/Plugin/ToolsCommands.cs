@@ -232,48 +232,6 @@ namespace BPlus.LiveMap
             });
         }
 
-        [CommandMethod("BPRENUM")]
-        public static void RenumberPts()
-        {
-            Guard("BPRENUM", () =>
-            {
-                var doc = Doc; var ed = doc.Editor;
-                var psr = ed.GetSelection(new PromptSelectionOptions { MessageForAdding = "\nSelect points to renumber" }, new SelectionFilter(new[] { new TypedValue((int)DxfCode.Start, "POINT,AECC_COGO_POINT") }));
-                if (psr.Status != PromptStatus.OK) return;
-                var all = SurveyCad.Collect(doc, psr.Value.GetObjectIds());
-                var cad = all.Where(c => !c.IsCogo).ToList(); int skipped = all.Count - cad.Count;
-                if (cad.Count == 0) { ed.WriteMessage("\n[B+] No plain points in the selection (COGO points are skipped).\n"); return; }
-                var ch = ToolsUi.Renumber(cad.Count); if (ch == null) return;
-                var plan = Core.Renumber.Plan(cad.Select(c => c.P).ToList(), ch.Start, ch.Step, ch.Sort, ch.Prefix, ch.Suffix);
-                int relabeled = 0;
-                using (doc.LockDocument())
-                using (var tr = doc.Database.TransactionManager.StartTransaction())
-                {
-                    var texts = new List<DBText>();
-                    if (ch.Labels)
-                    {
-                        var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(doc.Database), OpenMode.ForRead);
-                        foreach (ObjectId id in ms) { var t = tr.GetObject(id, OpenMode.ForRead) as DBText; if (t != null && t.Layer.StartsWith("BP-TXT-")) texts.Add(t); }
-                    }
-                    for (int i = 0; i < cad.Count; i++)
-                    {
-                        var c = cad[i]; string oldNo = c.P.No ?? "", desc = c.P.Desc ?? "";
-                        var dp = (DBPoint)tr.GetObject(c.Id, OpenMode.ForWrite);
-                        dp.XData = new ResultBuffer(new TypedValue((int)DxfCode.ExtendedDataRegAppName, SurveyCad.XApp), new TypedValue((int)DxfCode.ExtendedDataAsciiString, plan[i]), new TypedValue((int)DxfCode.ExtendedDataAsciiString, desc));
-                        if (ch.Labels)
-                        {
-                            string old = oldNo + (desc.Length == 0 ? "" : " " + desc), nw = plan[i] + (desc.Length == 0 ? "" : " " + desc);
-                            DBText best = null; double bd = Config.TextHeight * 10;
-                            foreach (var t in texts) { if (t.TextString != old) continue; double d = Geo2D.Distance(t.Position.X, t.Position.Y, c.P.E, c.P.N); if (d < bd) { bd = d; best = t; } }
-                            if (best != null) { var w = (DBText)tr.GetObject(best.ObjectId, OpenMode.ForWrite); w.TextString = nw; texts.Remove(best); relabeled++; }
-                        }
-                    }
-                    tr.Commit();
-                }
-                ed.WriteMessage("\n[B+] Renumbered " + cad.Count + " point(s) from " + ch.Start + " step " + ch.Step + (ch.Labels ? ", " + relabeled + " label(s) updated" : "") + (skipped > 0 ? ", " + skipped + " COGO point(s) skipped" : "") + ". One UNDO reverses it.\n");
-            });
-        }
-
         // ---------- Convert ----------
         static CsProvider NeedCs(Document doc)
         {
@@ -454,6 +412,72 @@ namespace BPlus.LiveMap
                     tr.Commit();
                 }
                 ed.WriteMessage(split == 0 ? "\n[B+] Nothing to split: each selected hatch is a single area.\n" : "\n[B+] Split " + split + " hatch(es) into " + made + " (" + (keep ? "originals kept" : "originals deleted") + "). New hatches are not associative. One UNDO reverses it.\n");
+            });
+        }
+
+        [CommandMethod("BPMAPOPT")]
+        public static void MapOptions()
+        {
+            Guard("BPMAPOPT", () =>
+            {
+                int k0 = Config.Kind == MapKind.Roadmap ? 1 : Config.Kind == MapKind.Hybrid ? 2 : 0, nk, no;
+                string follow = ToolsUi.MapOptions(k0, Config.OpacityPercent, out nk, out no); if (follow == null) return;
+                if (nk != k0 || no != Config.OpacityPercent)
+                {
+                    Config.Kind = nk == 1 ? MapKind.Roadmap : nk == 2 ? MapKind.Hybrid : MapKind.Satellite; Config.OpacityPercent = no;
+                    Engine.RefreshNow();
+                    Doc.Editor.WriteMessage("\n[B+] Map type and opacity saved" + (Engine.On ? "." : ". The map is off: click Live map to show it.") + "\n");
+                }
+                if (follow.Length > 0) Doc.SendStringToExecute(follow, true, false, false);
+            });
+        }
+
+        [CommandMethod("BPLEADER")]
+        public static void AutoLeader()
+        {
+            Guard("BPLEADER", () =>
+            {
+                var doc = Doc; var ed = doc.Editor;
+                var psr = ed.GetSelection(new PromptSelectionOptions { MessageForAdding = "\nSelect shapes to label with leaders" }, new SelectionFilter(new[] { new TypedValue((int)DxfCode.Start, CrvFilter) }));
+                if (psr.Status != PromptStatus.OK) return;
+                var ids = psr.Value.GetObjectIds(); var rows = LenRows(doc, ids);
+                if (rows.Count == 0) { ed.WriteMessage("\n[B+] Nothing measurable was selected.\n"); return; }
+                var ch = ToolsUi.Leader(rows.Count, rows.Count(r => r.Closed)); if (ch == null) return;
+                int made = 0, skipped = 0; double th = ch.TextH; string fmt = "F" + ch.Decimals; var inv = CultureInfo.InvariantCulture;
+                using (doc.LockDocument())
+                using (var tr = doc.Database.TransactionManager.StartTransaction())
+                {
+                    var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(doc.Database), OpenMode.ForWrite);
+                    var lay = SurveyCad.EnsureLayer(tr, doc.Database, "BP-LEADER", 7);
+                    foreach (var r in rows)
+                    {
+                        var c = (Curve)tr.GetObject((ObjectId)r.Tag, OpenMode.ForRead);
+                        string text; string lt = r.Len.ToString(fmt, inv) + " m", at = r.Area.ToString(fmt, inv) + " m\u00B2";
+                        if (ch.What == "len") text = lt;
+                        else if (ch.What == "area") { if (!r.Closed) { skipped++; continue; } text = at; }
+                        else if (ch.What == "both") text = r.Closed ? lt + "\\P" + at : lt;
+                        else text = r.Closed ? at : lt;
+                        Point3d start;
+                        try
+                        {
+                            if (ch.Centre && r.Closed) { var ext = c.GeometricExtents; start = new Point3d((ext.MinPoint.X + ext.MaxPoint.X) / 2, (ext.MinPoint.Y + ext.MaxPoint.Y) / 2, 0); }
+                            else start = c.GetPointAtDist(c.GetDistanceAtParameter(c.StartParam) + r.Len / 2);
+                        }
+                        catch { skipped++; continue; }
+                        var end = new Point3d(start.X + th * 3, start.Y + th * 3, start.Z);
+                        var ml = new MLeader();
+                        ml.SetDatabaseDefaults(doc.Database);
+                        ml.ContentType = ContentType.MTextContent;
+                        var mt = new MText { Contents = text, TextHeight = th }; mt.SetDatabaseDefaults(doc.Database);
+                        ml.MText = mt;
+                        int li = ml.AddLeader(); int ln = ml.AddLeaderLine(li);
+                        ml.AddFirstVertex(ln, start); ml.AddLastVertex(ln, end);
+                        ml.TextHeight = th; ml.ArrowSize = ch.Arrow ? th * 0.8 : 0.0; ml.LayerId = lay;
+                        ms.AppendEntity(ml); tr.AddNewlyCreatedDBObject(ml, true); made++;
+                    }
+                    tr.Commit();
+                }
+                ed.WriteMessage("\n[B+] " + made + " leader(s) on layer BP-LEADER" + (skipped > 0 ? ", " + skipped + " shape(s) skipped (open shape for an area label, or not measurable)" : "") + ". One UNDO removes them.\n");
             });
         }
     }

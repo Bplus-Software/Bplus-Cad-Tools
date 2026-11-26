@@ -19,7 +19,21 @@ namespace BPlus.LiveMap
         static string F2(double v) { return v.ToString("F3", CultureInfo.InvariantCulture); }
 
         [CommandMethod("BPIMPORT")]
-        public static void ImportPts()
+        public static void ImportAny()
+        {
+            Guard("BPIMPORT", () =>
+            {
+                switch (FormatPicker.Ask(true))
+                {
+                    case 0: case 1: ImportPts(); break;
+                    case 2: SdrImp(); break;
+                    case 3: GsiImp(); break;
+                    case 4: KmlImport(); break;
+                }
+            });
+        }
+
+        static void ImportPts()
         {
             Guard("BPIMPORT", () =>
             {
@@ -30,7 +44,31 @@ namespace BPlus.LiveMap
         }
 
         [CommandMethod("BPEXPORT")]
-        public static void ExportPts()
+        public static void ExportAny()
+        {
+            Guard("BPEXPORT", () =>
+            {
+                switch (FormatPicker.Ask(false))
+                {
+                    case 0: ExportPts(); break;
+                    case 1: ExportXlsx(); break;
+                    case 2: SdrExp(); break;
+                    case 3: GsiExp(); break;
+                    case 4: KmlExport(); break;
+                }
+            });
+        }
+
+        static void ExportXlsx()
+        {
+            var doc = Doc; var pts = SurveyCad.Collect(doc).Select(c => c.P).ToList();
+            if (pts.Count == 0) { doc.Editor.WriteMessage("\n[B+] No points found in model space.\n"); return; }
+            string path; using (var d = new System.Windows.Forms.SaveFileDialog { Filter = "Excel (*.xlsx)|*.xlsx", FileName = "points.xlsx", Title = "Export points to Excel" }) { if (d.ShowDialog() != System.Windows.Forms.DialogResult.OK) return; path = d.FileName; }
+            using (var fs = File.Create(path)) XlsxWriter.WritePoints(fs, pts);
+            doc.Editor.WriteMessage("\n[B+] Excel: exported " + pts.Count + " point(s) to " + path + ". Not opened in Excel here: tell us if Excel complains.\n");
+        }
+
+        static void ExportPts()
         {
             Guard("BPEXPORT", () =>
             {
@@ -174,11 +212,16 @@ namespace BPlus.LiveMap
             {
                 var doc = Doc; var ed = doc.Editor;
                 var psr = ed.GetSelection(new PromptSelectionOptions { MessageForAdding = "\nSelect objects to shift" }); if (psr.Status != PromptStatus.OK) return;
-                double[] d = new double[3]; string[] names = { "dE (east)", "dN (north)", "dZ (elevation)" };
-                for (int i = 0; i < 3; i++)
+                int cnt = psr.Value.Count; bool pick; double[] d;
+                if (!ShiftUi.Ask(cnt, out pick, out d)) return;
+                if (pick)
                 {
-                    var o = new PromptDoubleOptions("\nShift " + names[i] + " <0>: ") { AllowNone = true, DefaultValue = 0, UseDefaultValue = true }; var r = ed.GetDouble(o);
-                    if (r.Status != PromptStatus.OK) return; d[i] = r.Value;
+                    var pa = ed.GetPoint(new PromptPointOptions("\nPick point A (from): ")); if (pa.Status != PromptStatus.OK) return;
+                    var pbo = new PromptPointOptions("\nPick point B (to): ") { UseBasePoint = true, BasePoint = pa.Value, UseDashedLine = true };
+                    var pb = ed.GetPoint(pbo); if (pb.Status != PromptStatus.OK) return;
+                    var A = new[] { pa.Value.X, pa.Value.Y, pa.Value.Z }; var B = new[] { pb.Value.X, pb.Value.Y, pb.Value.Z };
+                    if (!ShiftUi.Confirm(A, B, cnt)) return;
+                    d = new[] { B[0] - A[0], B[1] - A[1], B[2] - A[2] };
                 }
                 if (d[0] == 0 && d[1] == 0 && d[2] == 0) return;
                 var m = Matrix3d.Displacement(new Vector3d(d[0], d[1], d[2])); int n = 0;

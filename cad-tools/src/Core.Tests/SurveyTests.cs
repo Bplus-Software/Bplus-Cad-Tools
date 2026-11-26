@@ -67,6 +67,24 @@ public class SurveyTests
     }
     static void Put(ZipArchive z, string n, string c) { var e = z.CreateEntry(n); using (var w = new StreamWriter(e.Open(), new UTF8Encoding(false))) w.Write(c); }
 
+    [Fact] public void XlsxWriterRoundTrips()
+    {
+        var ms = new MemoryStream();
+        XlsxWriter.WritePoints(ms, new[] { new SurveyPoint { No = "1", E = 500000.125, N = 2700000.5, Z = 12.3, Desc = "MNH & co" }, new SurveyPoint { No = "2", E = 1, N = 2, HasZ = false, Desc = "LP" } });
+        ms.Position = 0; var r = XlsxReader.ParsePoints(ms, "PENZD");
+        Assert.True(r.HeaderSkipped); Assert.Equal(2, r.Points.Count); Assert.Equal(500000.125, r.Points[0].E, 6); Assert.Equal(12.3, r.Points[0].Z, 6); Assert.Equal("MNH & co", r.Points[0].Desc); Assert.False(r.Points[1].HasZ);
+    }
+
+    static JPath JP(params double[] xy) { var p = new JPath(); for (int i = 0; i < xy.Length; i += 2) p.V.Add(new JV(xy[i], xy[i + 1])); p.Src.Add(0); return p; }
+    [Fact] public void JoinTouching() { var r = JoinLogic.Run(new[] { JP(0, 0, 10, 0), JP(10, 0, 10, 5) }, 0.5, JoinMode.Extend); Assert.Single(r.Paths); Assert.Equal(3, r.Paths[0].V.Count); Assert.Equal(0, r.Straight + r.Extended); }
+    [Fact] public void JoinExtendsCorner() { var r = JoinLogic.Run(new[] { JP(0, 0, 9.8, 0), JP(10, 0.3, 10, 5) }, 0.5, JoinMode.Extend); Assert.Single(r.Paths); Assert.Equal(1, r.Extended); Assert.Equal(3, r.Paths[0].V.Count); Assert.Equal(10, r.Paths[0].V[1].X, 6); Assert.Equal(0, r.Paths[0].V[1].Y, 6); }
+    [Fact] public void JoinStraightWhenParallel() { var r = JoinLogic.Run(new[] { JP(0, 0, 9.8, 0), JP(10, 0, 20, 0) }, 0.5, JoinMode.Extend); Assert.Single(r.Paths); Assert.Equal(1, r.Straight); Assert.Equal(4, r.Paths[0].V.Count); }
+    [Fact] public void JoinTooFarStaysOpen() { var r = JoinLogic.Run(new[] { JP(0, 0, 9, 0), JP(10, 0, 20, 0) }, 0.5, JoinMode.Extend); Assert.Equal(2, r.Paths.Count); Assert.Equal(0, r.LeftOpen > 0 ? 0 : 1); }
+    [Fact] public void JoinReversesAndCloses() { var r = JoinLogic.Run(new[] { JP(0, 0, 10, 0), JP(10, 10, 10, 0.1), JP(0, 10, 10, 10), JP(0, 0.1, 0, 10) }, 0.5, JoinMode.Straight); Assert.Single(r.Paths); Assert.True(r.Paths[0].Closed); }
+    [Fact] public void JoinTouchOnlyIgnoresGap() { var r = JoinLogic.Run(new[] { JP(0, 0, 9.8, 0), JP(10, 0, 20, 0) }, 0.5, JoinMode.Touch); Assert.Equal(2, r.Paths.Count); }
+    [Fact] public void ReverseFlipsBulge() { var p = new JPath(); p.V.Add(new JV(0, 0, 1)); p.V.Add(new JV(2, 0, 0)); p.V.Add(new JV(2, 2, 0)); p.Reverse(); Assert.Equal(0, p.V[0].B); Assert.Equal(-1, p.V[1].B); }
+    [Fact] public void PolyContains() { var sq = Poly2D.Flatten(new[] { new JV(0, 0), new JV(10, 0), new JV(10, 10), new JV(0, 10) }, true); Assert.True(Poly2D.Contains(sq, 5, 5)); Assert.True(Poly2D.Contains(sq, 10, 5)); Assert.False(Poly2D.Contains(sq, 11, 5)); var semi = Poly2D.Flatten(new[] { new JV(0, 0, 1), new JV(2, 0) }, true); Assert.True(Poly2D.Contains(semi, 1, -0.9)); Assert.False(Poly2D.Contains(semi, 1, 0.5)); }
+
     [Fact] public void CodesClassify()
     {
         var r = CodeRules.Default();
