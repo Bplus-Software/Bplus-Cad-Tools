@@ -44,7 +44,7 @@ namespace BPlus.LiveMap
             var t = (RegAppTable)tr.GetObject(db.RegAppTableId, OpenMode.ForRead);
             if (!t.Has(XApp)) { t.UpgradeOpen(); var r = new RegAppTableRecord { Name = XApp }; t.Add(r); tr.AddNewlyCreatedDBObject(r, true); }
         }
-        static ObjectId EnsureLayer(Transaction tr, Database db, string name, short color)
+        internal static ObjectId EnsureLayer(Transaction tr, Database db, string name, short color)
         {
             var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
             if (lt.Has(name)) return lt[name];

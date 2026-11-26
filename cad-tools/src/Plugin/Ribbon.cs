@@ -30,8 +30,13 @@ namespace BPlus.LiveMap
                 var rc = ComponentManager.Ribbon; if (rc == null) return false;
                 foreach (var t in rc.Tabs) if (t.Id == TabId) return true;
                 var tab = new RibbonTab { Title = "B+ CAD Tools", Id = TabId };
-                AddPanel(tab, "Points", L("Import points", "BPIMPORT ", "import", "Import a points file (txt, csv, xlsx) as points with codes and layers"), L("Export points", "BPEXPORT ", "export", "Export points to a clean text or csv file"), L("Show / hide", "BPISOLATE ", "layers", "Show or hide point categories"), L("Codes", "BPCODES ", "codes", "Edit the point code rules"));
+                AddPanel(tab, "Points", L("Import points", "BPIMPORT ", "import", "Import a points file (txt, csv, xlsx) as points with codes and layers"), L("Export points", "BPEXPORT ", "export", "Export points to a clean text or csv file"), L("Renumber", "BPRENUM ", "renum", "Renumber the selected points"), L("Show / hide", "BPISOLATE ", "layers", "Show or hide point categories"), L("Codes", "BPCODES ", "codes", "Edit the point code rules"));
+                AddMenuPanel(tab, "Convert",
+                    Menu("Import", "import", "Import KML/KMZ, SDR, GSI or a points file", Item("Points file (TXT, CSV, XLSX)", "BPIMPORT "), Item("Google Earth (KML, KMZ)", "BPKMLIMP "), new RibbonSeparator(), Item("Sokkia / Trimble SDR (unverified)", "BPSDRIMP "), Item("Leica GSI (unverified)", "BPGSIIMP ")),
+                    Menu("Export", "export", "Export points or lines to KML/KMZ, SDR, GSI or a text file", Item("Points file (TXT, CSV)", "BPEXPORT "), Item("Google Earth (KML, KMZ)", "BPKMLEXP "), new RibbonSeparator(), Item("Sokkia / Trimble SDR (unverified)", "BPSDREXP "), Item("Leica GSI-16 (unverified)", "BPGSIEXP ")));
                 AddPanel(tab, "Draw", L("Connect points", "BPCONNECT ", "connect", "Draw lines through points by code and point number"));
+                AddPanel(tab, "Polylines", L("Lengths", "BPLENGTHS ", "lengths", "List length and area of selected polylines, with table, CSV and labels"), L("Label", "BPLABEL ", "label", "Write length and area next to the selected polylines"), L("Vertices to points", "BPVERTS ", "verts", "Make a numbered point at every vertex"), L("Coordinates", "BPCOORD ", "coord", "Write E and N at points and vertices"));
+                AddPanel(tab, "Hatch", L("Merge", "BPHATCHMERGE ", "merge", "Combine several hatches into one"), L("Split", "BPHATCHSPLIT ", "split", "Split a hatch into one hatch per separate area"));
                 AddPanel(tab, "Survey QA", L("QA / QC", "BPQAQC ", "qa", "Check points: repeated numbers, duplicates, missing code or elevation, spikes"), L("Shift", "BPSHIFT ", "shift", "Move the selection by dE, dN, dZ"));
                 AddPanel(tab, "Quantities", L("Area", "BPAREA ", "area", "Area of closed polylines in m2, with perimeter in m"), L("Distance", "BPDIST ", "dist", "Distance, azimuth and bearing between two points"));
                 var src = new RibbonPanelSource { Title = "Live Map" };
@@ -75,6 +80,21 @@ namespace BPlus.LiveMap
             tab.Panels.Add(new RibbonPanel { Source = src });
         }
 
+        static void AddMenuPanel(RibbonTab tab, string title, params object[] menus)
+        {
+            var src = new RibbonPanelSource { Title = title };
+            foreach (object m in menus)
+            {
+                var d = (MenuDef)m;
+                var sb = new RibbonSplitButton { Text = d.Text, ShowText = true, ShowImage = true, Size = RibbonItemSize.Large, Orientation = System.Windows.Controls.Orientation.Vertical, LargeImage = Icon(32, d.Icon), Image = Icon(16, d.Icon), IsSplit = false, ListButtonStyle = Autodesk.Private.Windows.RibbonListButtonStyle.MenuButton, ToolTip = d.Tip };
+                foreach (var it in d.Items) sb.Items.Add(it);
+                try { sb.Current = null; sb.Text = d.Text; } catch { }
+                src.Items.Add(sb);
+            }
+            tab.Panels.Add(new RibbonPanel { Source = src });
+        }
+        sealed class MenuDef { public string Text, Icon, Tip; public RibbonItem[] Items; }
+        static MenuDef Menu(string text, string icon, string tip, params RibbonItem[] items) { return new MenuDef { Text = text, Icon = icon, Tip = tip, Items = items }; }
         static RibbonButton Item(string text, string cmd) { return new RibbonButton { Text = text, ShowText = true, ShowImage = false, CommandHandler = new Cmd(), CommandParameter = cmd }; }
 
         sealed class Cmd : System.Windows.Input.ICommand
@@ -145,6 +165,37 @@ namespace BPlus.LiveMap
                 else if (kind == "about")
                 {
                     g.DrawEllipse(white, k(4), k(4), k(24), k(24)); g.DrawLine(white, k(16), k(14), k(16), k(23)); g.FillEllipse(Brushes.White, k(14.5f), k(8.5f), k(3), k(3));
+                }
+                else if (kind == "lengths")
+                {
+                    g.DrawLine(white, k(4), k(26), k(28), k(26)); for (int i = 0; i <= 6; i++) g.DrawLine(white, k(4 + i * 4), k(26), k(4 + i * 4), k(i % 2 == 0 ? 18 : 22));
+                    g.DrawLines(white, new[] { new PointF(k(5), k(14)), new PointF(k(12), k(6)), new PointF(k(19), k(12)), new PointF(k(27), k(5)) });
+                }
+                else if (kind == "label")
+                {
+                    g.DrawLine(white, k(4), k(22), k(28), k(10)); g.DrawRectangle(white, k(12), k(3), k(16), k(8)); g.DrawLine(white, k(14), k(7), k(26), k(7));
+                }
+                else if (kind == "verts")
+                {
+                    var q = new[] { new PointF(k(5), k(24)), new PointF(k(10), k(8)), new PointF(k(22), k(14)), new PointF(k(27), k(5)) };
+                    g.DrawLines(white, q); foreach (var pt in q) g.DrawRectangle(white, pt.X - k(2.5f), pt.Y - k(2.5f), k(5), k(5));
+                }
+                else if (kind == "coord")
+                {
+                    g.DrawLine(white, k(6), k(6), k(6), k(26)); g.DrawLine(white, k(6), k(26), k(26), k(26)); g.DrawEllipse(white, k(14), k(12), k(8), k(8)); g.DrawLine(white, k(18), k(16), k(18), k(26)); g.DrawLine(white, k(6), k(16), k(18), k(16));
+                }
+                else if (kind == "merge")
+                {
+                    g.DrawRectangle(white, k(4), k(8), k(10), k(16)); g.DrawRectangle(white, k(18), k(8), k(10), k(16)); g.DrawLine(white, k(14), k(16), k(18), k(16));
+                }
+                else if (kind == "split")
+                {
+                    g.DrawRectangle(white, k(4), k(6), k(24), k(20)); g.DrawLine(white, k(16), k(3), k(16), k(29));
+                    for (int i = 0; i < 4; i++) { g.DrawLine(white, k(6), k(10 + i * 5), k(10), k(6 + i * 5)); g.DrawLine(white, k(20), k(10 + i * 5), k(24), k(6 + i * 5)); }
+                }
+                else if (kind == "renum")
+                {
+                    g.DrawEllipse(white, k(3), k(8), k(10), k(10)); g.DrawEllipse(white, k(19), k(8), k(10), k(10)); g.DrawArc(white, k(8), k(14), k(16), k(12), 20, 140); g.DrawLines(white, new[] { new PointF(k(21), k(22)), new PointF(k(24), k(26)), new PointF(k(25), k(21)) });
                 }
                 else if (kind == "dist")
                 {

@@ -46,7 +46,7 @@ namespace BPlus.LiveMap.Setup
                 {
                     string exe = Assembly.GetExecutingAssembly().Location;
                     k.SetValue("DisplayName", "B+ CAD Tools (experimental)");
-                    k.SetValue("DisplayVersion", "0.3.2");
+                    k.SetValue("DisplayVersion", "0.4.0");
                     k.SetValue("Publisher", "BPlus Software");
                     k.SetValue("InstallLocation", target);
                     k.SetValue("UninstallString", "\"" + exe + "\" /U");
