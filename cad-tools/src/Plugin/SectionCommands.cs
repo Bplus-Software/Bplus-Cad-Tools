@@ -181,9 +181,9 @@ namespace BPlus.LiveMap
             Guard("BPSECTION", () =>
             {
                 var doc = Doc; var ed = doc.Editor; var db = doc.Database;
-                var eo = new PromptEntityOptions("\nSelect the road line (polyline, line or arc): "); eo.SetRejectMessage("\nOnly a polyline, line or arc."); eo.AddAllowedClass(typeof(Curve), false);
+                var eo = new PromptEntityOptions(Ar.T("\nSelect the road line (polyline, line or arc): ")); eo.SetRejectMessage(Ar.T("\nOnly a polyline, line or arc.")); eo.AddAllowedClass(typeof(Curve), false);
                 var er = ed.GetEntity(eo); if (er.Status != PromptStatus.OK) return;
-                var po = new PromptSelectionOptions { MessageForAdding = "\nSelect the ground points (AutoCAD points or COGO points), or press Enter to skip: " };
+                var po = new PromptSelectionOptions { MessageForAdding = Ar.T("\nSelect the ground points (AutoCAD points or COGO points), or press Enter to skip: ") };
                 SelResult psr = null; try { psr = Sel.Get(ed, po, "POINT,AECC_COGO_POINT"); } catch { psr = null; }
                 bool havePts = psr != null && psr.Status == PromptStatus.OK && psr.Value.Count > 0;
                 double length; using (var tr = db.TransactionManager.StartTransaction()) { var cv0 = (Curve)tr.GetObject(er.ObjectId, OpenMode.ForRead); length = cv0.GetDistanceAtParameter(cv0.EndParam); tr.Commit(); }
@@ -195,13 +195,13 @@ namespace BPlus.LiveMap
                 Func<Curve, Point3d, double, Vector3d> leftN = (cv, q, s) => { var dv = cv.GetFirstDerivative(q); dv = dv.GetNormal(); return new Vector3d(-dv.Y, dv.X, 0); };
                 if (!ch.Whole)
                 {
-                    var pp = ed.GetPoint("\nPick the station: click a point near the line where the section goes: "); if (pp.Status != PromptStatus.OK) return;
+                    var pp = ed.GetPoint(Ar.T("\nPick the station: click a point near the line where the section goes: ")); if (pp.Status != PromptStatus.OK) return;
                     using (var tr = db.TransactionManager.StartTransaction()) { var cv = (Curve)tr.GetObject(er.ObjectId, OpenMode.ForRead); var q = cv.GetClosestPointTo(new Point3d(pp.Value.X, pp.Value.Y, 0), Vector3d.ZAxis, false); oneSta = cv.GetDistAtPoint(q); tr.Commit(); }
                     if (ch.Road == 2)
                     {
-                        var a = ed.GetPoint("\nPick one edge of the carriageway (kerb to kerb): "); if (a.Status != PromptStatus.OK) return;
-                        var b = ed.GetPoint("\nPick the other edge: "); if (b.Status != PromptStatus.OK) return;
-                        var c = ed.GetPoint("\nPick the centre of the road: "); if (c.Status != PromptStatus.OK) return; p1 = a.Value; p2 = b.Value; pc = c.Value;
+                        var a = ed.GetPoint(Ar.T("\nPick one edge of the carriageway (kerb to kerb): ")); if (a.Status != PromptStatus.OK) return;
+                        var b = ed.GetPoint(Ar.T("\nPick the other edge: ")); if (b.Status != PromptStatus.OK) return;
+                        var c = ed.GetPoint(Ar.T("\nPick the centre of the road: ")); if (c.Status != PromptStatus.OK) return; p1 = a.Value; p2 = b.Value; pc = c.Value;
                     }
                 }
                 using (doc.LockDocument())
@@ -238,7 +238,7 @@ namespace BPlus.LiveMap
                             {
                                 Func<Point3d, double> offOf = pt => -((pt.X - q.X) * nl.X + (pt.Y - q.Y) * nl.Y);
                                 double o1 = offOf(p1), o2 = offOf(p2), oc = offOf(pc), lo = Math.Min(o1, o2), hi = Math.Max(o1, o2), w = hi - lo;
-                                if (w < 0.5) { ed.WriteMessage("\n[B+] The two edge points are less than 0.5 m apart across the road. Nothing drawn.\n"); return; }
+                                if (w < 0.5) { ed.WriteMessage(Ar.T("\n[B+] The two edge points are less than 0.5 m apart across the road. Nothing drawn.\n")); return; }
                                 road = new RoadSpec { LeftEdge = lo, RightEdge = hi, Centre = oc, Lanes = ch.Divide ? SectionMath.EqualLanes(w, ch.Lanes.Length) : ch.Lanes };
                                 if (!ch.Divide && Math.Abs(ch.Lanes.Sum() - w) > 0.01) notes.Add("typed lanes add up to " + ch.Lanes.Sum().ToString("0.###", CultureInfo.InvariantCulture) + " m but the picked road is " + w.ToString("0.###", CultureInfo.InvariantCulture) + " m");
                             }
@@ -252,10 +252,10 @@ namespace BPlus.LiveMap
                     }
                     tr.Commit();
                 }
-                if (models.Count == 0) { ed.WriteMessage("\n[B+] Nothing to draw. " + string.Join("; ", notes) + "\n"); return; }
-                var ip = ed.GetPoint("\nPick the insertion point (top left of the first section): "); if (ip.Status != PromptStatus.OK) return;
+                if (models.Count == 0) { ed.WriteMessage(Ar.T("\n[B+] Nothing to draw. ") + string.Join("; ", notes) + "\n"); return; }
+                var ip = ed.GetPoint(Ar.T("\nPick the insertion point (top left of the first section): ")); if (ip.Status != PromptStatus.OK) return;
                 int made = DrawSections(doc, models, halfs, ip.Value, ch.TextH, ch.Cols, ch.GroundLine, ch.GroundCol);
-                ed.WriteMessage("\n[B+] " + models.Count + " section(s) drawn on layer B+_SECTION (" + made + " objects)" + (skipped > 0 ? ", " + skipped + " station(s) skipped for lack of points" : "") + ". Left of the line is negative. It is a drawing: it does not update if points move. It does not check the widths against any standard." + (notes.Count > 0 ? "\n[B+] Notes: " + string.Join("; ", notes.Take(12)) + (notes.Count > 12 ? "; and " + (notes.Count - 12) + " more" : "") : "") + "\n");
+                ed.WriteMessage("\n[B+] " + models.Count + Ar.T(" section(s) drawn on layer B+_SECTION (") + made + Ar.T(" objects)") + (skipped > 0 ? ", " + skipped + Ar.T(" station(s) skipped for lack of points") : "") + Ar.T(". Left of the line is negative. It is a drawing: it does not update if points move. It does not check the widths against any standard.") + (notes.Count > 0 ? Ar.T("\n[B+] Notes: ") + string.Join("; ", notes.Take(12)) + (notes.Count > 12 ? Ar.T("; and ") + (notes.Count - 12) + Ar.T(" more") : "") : "") + "\n");
             });
         }
     }

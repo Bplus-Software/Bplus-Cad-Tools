@@ -39,7 +39,7 @@ namespace BPlus.LiveMap
             {
                 var doc = Doc; var c = SurveyUi.Import(); if (c == null || c.Result == null) return;
                 int n = SurveyCad.Import(doc, c.Result.Points, SurveyCad.LoadRules(), c.Labels, c.TextH, true);
-                doc.Editor.WriteMessage("\n[BPlus] Imported " + n + " points" + (c.Result.Problems.Count > 0 ? ", skipped " + c.Result.Problems.Count + " bad lines" : "") + ". Use ZOOM EXTENTS to see them.\n");
+                doc.Editor.WriteMessage(Ar.T("\n[BPlus] Imported ") + n + Ar.T(" points") + (c.Result.Problems.Count > 0 ? Ar.T(", skipped ") + c.Result.Problems.Count + Ar.T(" bad lines") : "") + Ar.T(". Use ZOOM EXTENTS to see them.\n"));
             });
         }
 
@@ -62,10 +62,10 @@ namespace BPlus.LiveMap
         static void ExportXlsx()
         {
             var doc = Doc; var pts = SurveyCad.Collect(doc).Select(c => c.P).ToList();
-            if (pts.Count == 0) { doc.Editor.WriteMessage("\n[B+] No points found in model space.\n"); return; }
+            if (pts.Count == 0) { doc.Editor.WriteMessage(Ar.T("\n[B+] No points found in model space.\n")); return; }
             string path; using (var d = new System.Windows.Forms.SaveFileDialog { Filter = "Excel (*.xlsx)|*.xlsx", FileName = "points.xlsx", Title = "Export points to Excel" }) { if (d.ShowDialog() != System.Windows.Forms.DialogResult.OK) return; path = d.FileName; }
             using (var fs = File.Create(path)) XlsxWriter.WritePoints(fs, pts);
-            doc.Editor.WriteMessage("\n[B+] Excel: exported " + pts.Count + " point(s) to " + path + ". Not opened in Excel here: tell us if Excel complains.\n");
+            doc.Editor.WriteMessage(Ar.T("\n[B+] Excel: exported ") + pts.Count + Ar.T(" point(s) to ") + path + Ar.T(". Not opened in Excel here: tell us if Excel complains.\n"));
         }
 
         static void ExportPts()
@@ -73,19 +73,19 @@ namespace BPlus.LiveMap
             Guard("BPEXPORT", () =>
             {
                 var doc = Doc; var pts = SurveyCad.Collect(doc);
-                if (pts.Count == 0) { doc.Editor.WriteMessage("\n[BPlus] No points found in model space.\n"); return; }
+                if (pts.Count == 0) { doc.Editor.WriteMessage(Ar.T("\n[BPlus] No points found in model space.\n")); return; }
                 var cats = pts.GroupBy(p => p.P.Category).OrderBy(g => g.Key).Select(g => new KeyValuePair<string, int>(g.Key, g.Count())).ToList();
                 var c = SurveyUi.Export(cats); if (c == null) return;
                 var sel = pts.Where(p => c.Cats.Contains(p.P.Category)).Select(p => p.P).ToList();
                 File.WriteAllText(c.Path, PointText.Format(sel, c.Order, c.Delim, c.Decimals, c.Header), new UTF8Encoding(false));
-                doc.Editor.WriteMessage("\n[BPlus] Exported " + sel.Count + " points to " + c.Path + "\n");
+                doc.Editor.WriteMessage(Ar.T("\n[BPlus] Exported ") + sel.Count + Ar.T(" points to ") + c.Path + "\n");
             });
         }
 
         [CommandMethod("BPCODES")]
         public static void EditCodes()
         {
-            Guard("BPCODES", () => { var t = SurveyUi.Codes(SurveyCad.RulesText()); if (t != null) { SurveyCad.SaveRulesText(t); Doc.Editor.WriteMessage("\n[BPlus] Codes saved to " + SurveyCad.CodesFile + "\n"); } });
+            Guard("BPCODES", () => { var t = SurveyUi.Codes(SurveyCad.RulesText()); if (t != null) { SurveyCad.SaveRulesText(t); Doc.Editor.WriteMessage(Ar.T("\n[BPlus] Codes saved to ") + SurveyCad.CodesFile + "\n"); } });
         }
 
         [CommandMethod("BPISOLATE")]
@@ -94,7 +94,7 @@ namespace BPlus.LiveMap
             Guard("BPISOLATE", () =>
             {
                 var doc = Doc; var layers = SurveyCad.SurveyLayers(doc);
-                if (layers.Count == 0) { doc.Editor.WriteMessage("\n[BPlus] No BP-PT layers yet. Import points first.\n"); return; }
+                if (layers.Count == 0) { doc.Editor.WriteMessage(Ar.T("\n[BPlus] No BP-PT layers yet. Import points first.\n")); return; }
                 var r = SurveyUi.Isolate(layers, SurveyCad.LayerOnState(doc)); if (r != null) SurveyCad.SetLayers(doc, r);
             });
         }
@@ -105,7 +105,7 @@ namespace BPlus.LiveMap
             Guard("BPQAQC", () =>
             {
                 var doc = Doc; var pts = SurveyCad.Collect(doc);
-                if (pts.Count == 0) { doc.Editor.WriteMessage("\n[BPlus] No points found in model space.\n"); return; }
+                if (pts.Count == 0) { doc.Editor.WriteMessage(Ar.T("\n[BPlus] No points found in model space.\n")); return; }
                 var issues = SurveyQa.Run(pts.Select(p => p.P).ToList(), new QaOptions());
                 int sel = -1; var byHandle = pts.Where(p => !string.IsNullOrEmpty(p.P.Ref)).GroupBy(p => p.P.Ref).ToDictionary(g => g.Key, g => g.First().Id);
                 try
@@ -118,8 +118,8 @@ namespace BPlus.LiveMap
                         sel = row;
                         if (action == 1) { var q = rows[row].P; SurveyCad.ZoomTo(doc, q.E, q.N, q.HasZ ? q.Z : 0); continue; }
                         var ids = rows.Where(r => r.Issue == rows[row].Issue && r.P.Ref != null && byHandle.ContainsKey(r.P.Ref)).Select(r => byHandle[r.P.Ref]).Distinct().ToArray();
-                        if (ids.Length > 0) { doc.Editor.SetImpliedSelection(ids); doc.Editor.WriteMessage("\n[B+] " + ids.Length + " point(s) selected. Press Delete, move them, or Esc.\n"); }
-                        else doc.Editor.WriteMessage("\n[B+] These points are not in the drawing as objects, so they cannot be selected.\n");
+                        if (ids.Length > 0) { doc.Editor.SetImpliedSelection(ids); doc.Editor.WriteMessage("\n[B+] " + ids.Length + Ar.T(" point(s) selected. Press Delete, move them, or Esc.\n")); }
+                        else doc.Editor.WriteMessage(Ar.T("\n[B+] These points are not in the drawing as objects, so they cannot be selected.\n"));
                         break;
                     }
                 }
@@ -133,19 +133,19 @@ namespace BPlus.LiveMap
             Guard("BPCONNECT", () =>
             {
                 var doc = Doc; var ed = doc.Editor;
-                var opt = new PromptSelectionOptions { MessageForAdding = "\nSelect points (Enter for all points)" };
+                var opt = new PromptSelectionOptions { MessageForAdding = Ar.T("\nSelect points (Enter for all points)") };
                 var psr = Sel.Get(ed, opt, "POINT,AECC_COGO_POINT");
                 ICollection<ObjectId> only = null;
                 if (psr.Status == PromptStatus.OK) only = psr.Value.GetObjectIds();
                 else if (psr.Status != PromptStatus.Error) return;
                 var pts = SurveyCad.Collect(doc, only);
-                if (pts.Count < 2) { ed.WriteMessage("\n[BPlus] Need at least two points.\n"); return; }
+                if (pts.Count < 2) { ed.WriteMessage(Ar.T("\n[BPlus] Need at least two points.\n")); return; }
                 var c = SurveyUi.Connect(); if (c == null) return;
                 var codes = c.Only.Split(new[] { ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries).Select(x => x.Trim().ToUpperInvariant()).ToList();
                 var lines = Connect.Build(pts.Select(p => p.P).ToList(), c.ByCode, c.SplitByNumber, codes.Count > 0 ? codes : null);
-                if (lines.Count == 0) { ed.WriteMessage("\n[BPlus] No lines to draw. Points need a code with at least two points.\n"); return; }
+                if (lines.Count == 0) { ed.WriteMessage(Ar.T("\n[BPlus] No lines to draw. Points need a code with at least two points.\n")); return; }
                 int n = SurveyCad.DrawLines(doc, lines, SurveyCad.LoadRules(), c.ByCode);
-                ed.WriteMessage("\n[BPlus] Drew " + n + " line(s) from " + lines.Sum(l => l.Pts.Count) + " points.\n");
+                ed.WriteMessage(Ar.T("\n[BPlus] Drew ") + n + Ar.T(" line(s) from ") + lines.Sum(l => l.Pts.Count) + Ar.T(" points.\n"));
             });
         }
 
@@ -178,12 +178,12 @@ namespace BPlus.LiveMap
                 var ed = Doc.Editor;
                 while (true)
                 {
-                    var a = ed.GetPoint(new PromptPointOptions("\nFirst point (Enter to finish): ") { AllowNone = true }); if (a.Status != PromptStatus.OK) return;
-                    var o = new PromptPointOptions("\nSecond point: ") { UseBasePoint = true, BasePoint = a.Value, UseDashedLine = true };
+                    var a = ed.GetPoint(new PromptPointOptions(Ar.T("\nFirst point (Enter to finish): ")) { AllowNone = true }); if (a.Status != PromptStatus.OK) return;
+                    var o = new PromptPointOptions(Ar.T("\nSecond point: ")) { UseBasePoint = true, BasePoint = a.Value, UseDashedLine = true };
                     var b = ed.GetPoint(o); if (b.Status != PromptStatus.OK) return;
                     double h = Geo2D.Distance(a.Value.X, a.Value.Y, b.Value.X, b.Value.Y), dz = b.Value.Z - a.Value.Z, az = Geo2D.Azimuth(a.Value.X, a.Value.Y, b.Value.X, b.Value.Y);
                     double sl = Math.Sqrt(h * h + dz * dz), de = b.Value.X - a.Value.X, dn = b.Value.Y - a.Value.Y, grade = h > 1e-9 ? dz / h * 100 : 0;
-                    ed.WriteMessage("\n[B+] Horizontal " + F2(h) + " m   Slope " + F2(sl) + " m   dZ " + F2(dz) + " m   Azimuth " + Geo2D.Dms(az) + "   Bearing " + Geo2D.QuadrantBearing(az) + "\n");
+                    ed.WriteMessage(Ar.T("\n[B+] Horizontal ") + F2(h) + Ar.T(" m   Slope ") + F2(sl) + " m   dZ " + F2(dz) + Ar.T(" m   Azimuth ") + Geo2D.Dms(az) + Ar.T("   Bearing ") + Geo2D.QuadrantBearing(az) + "\n");
                     var rows = new List<string[]> {
                         new[] { "Horizontal distance", M3(h) + " m" }, new[] { "Slope distance (with Z)", M3(sl) + " m" }, new[] { "Height difference (dZ)", M3(dz) + " m" }, new[] { "Grade", dz == 0 ? "0 %" : grade.ToString("0.###", CultureInfo.InvariantCulture) + " %" },
                         new[] { "Azimuth", Geo2D.Dms(az) }, new[] { "Bearing", Geo2D.QuadrantBearing(az) }, new[] { "dE   dN", M3(de) + "   " + M3(dn) },
@@ -202,10 +202,10 @@ namespace BPlus.LiveMap
             Guard("BPAREA", () =>
             {
                 var doc = Doc; var ed = doc.Editor;
-                var psr = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = "\nSelect closed polylines" }, "LWPOLYLINE,POLYLINE");
+                var psr = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = Ar.T("\nSelect closed polylines") }, Ar.T("LWPOLYLINE,POLYLINE"));
                 if (psr.Status != PromptStatus.OK) return;
-                try { var iu = Convert.ToInt32(AcApp.GetSystemVariable("INSUNITS")); if (iu != 6 && iu != 0) ed.WriteMessage("\n[B+] Note: this drawing's units (INSUNITS=" + iu + ") are not metres. Results below are in drawing units, shown as m and m2."); } catch { }
-                var kw = new PromptKeywordOptions("\nPlace an area label for each? [Yes/No] <No>: ", "Yes No") { AllowNone = true }; var kr = ed.GetKeywords(kw);
+                try { var iu = Convert.ToInt32(AcApp.GetSystemVariable(Ar.T("INSUNITS"))); if (iu != 6 && iu != 0) ed.WriteMessage(Ar.T("\n[B+] Note: this drawing's units (INSUNITS=") + iu + Ar.T(") are not metres. Results below are in drawing units, shown as m and m2.")); } catch { }
+                var kw = new PromptKeywordOptions(Ar.T("\nPlace an area label for each? [Yes/No] <No>: "), Ar.T("Yes No")) { AllowNone = true }; var kr = ed.GetKeywords(kw);
                 bool label = kr.Status == PromptStatus.OK && kr.StringResult == "Yes";
                 double total = 0; int n = 0, skipped = 0;
                 using (doc.LockDocument())
@@ -220,7 +220,7 @@ namespace BPlus.LiveMap
                         for (int i = 0; i < pl.NumberOfVertices; i++) { var p = pl.GetPoint2dAt(i); e.Add(p.X); nn.Add(p.Y); if (Math.Abs(pl.GetBulgeAt(i)) > 1e-9) bulge = true; }
                         double a = bulge ? pl.Area : Geo2D.PolygonArea(e, nn); double per = bulge ? pl.Length : Geo2D.Perimeter(e, nn, true);
                         total += a; n++;
-                        ed.WriteMessage("\n" + F2(a) + " m2   perimeter " + F2(per) + " m");
+                        ed.WriteMessage("\n" + F2(a) + Ar.T(" m2   perimeter ") + F2(per) + " m");
                         if (label)
                         {
                             Point3d c; try { var ext = pl.GeometricExtents; c = new Point3d((ext.MinPoint.X + ext.MaxPoint.X) / 2, (ext.MinPoint.Y + ext.MaxPoint.Y) / 2, 0); } catch { c = Point3d.Origin; }
@@ -231,7 +231,7 @@ namespace BPlus.LiveMap
                     }
                     tr.Commit();
                 }
-                ed.WriteMessage("\n" + n + " polyline(s), total " + F2(total) + " m2" + (skipped > 0 ? "   (" + skipped + " skipped: open or not a polyline)" : "") + "\n");
+                ed.WriteMessage("\n" + n + Ar.T(" polyline(s), total ") + F2(total) + " m2" + (skipped > 0 ? "   (" + skipped + Ar.T(" skipped: open or not a polyline)") : "") + "\n");
             });
         }
 
@@ -241,13 +241,13 @@ namespace BPlus.LiveMap
             Guard("BPSHIFT", () =>
             {
                 var doc = Doc; var ed = doc.Editor;
-                var psr = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = "\nSelect objects to shift" }, null); if (psr.Status != PromptStatus.OK) return;
+                var psr = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = Ar.T("\nSelect objects to shift") }, null); if (psr.Status != PromptStatus.OK) return;
                 int cnt = psr.Value.Count; bool pick; double[] d;
                 if (!ShiftUi.Ask(cnt, out pick, out d)) return;
                 if (pick)
                 {
-                    var pa = ed.GetPoint(new PromptPointOptions("\nPick point A (from): ")); if (pa.Status != PromptStatus.OK) return;
-                    var pbo = new PromptPointOptions("\nPick point B (to): ") { UseBasePoint = true, BasePoint = pa.Value, UseDashedLine = true };
+                    var pa = ed.GetPoint(new PromptPointOptions(Ar.T("\nPick point A (from): "))); if (pa.Status != PromptStatus.OK) return;
+                    var pbo = new PromptPointOptions(Ar.T("\nPick point B (to): ")) { UseBasePoint = true, BasePoint = pa.Value, UseDashedLine = true };
                     var pb = ed.GetPoint(pbo); if (pb.Status != PromptStatus.OK) return;
                     var A = new[] { pa.Value.X, pa.Value.Y, pa.Value.Z }; var B = new[] { pb.Value.X, pb.Value.Y, pb.Value.Z };
                     if (!ShiftUi.Confirm(A, B, cnt)) return;
@@ -261,7 +261,7 @@ namespace BPlus.LiveMap
                     foreach (var id in psr.Value.GetObjectIds()) { var en = tr.GetObject(id, OpenMode.ForWrite) as Entity; if (en != null) { en.TransformBy(m); n++; } }
                     tr.Commit();
                 }
-                ed.WriteMessage("\n[BPlus] Shifted " + n + " object(s) by " + F2(d[0]) + ", " + F2(d[1]) + ", " + F2(d[2]) + ". UNDO reverses it.\n");
+                ed.WriteMessage(Ar.T("\n[BPlus] Shifted ") + n + Ar.T(" object(s) by ") + F2(d[0]) + ", " + F2(d[1]) + ", " + F2(d[2]) + Ar.T(". UNDO reverses it.\n"));
             });
         }
     }
@@ -276,10 +276,10 @@ namespace BPlus.LiveMap
         [CommandMethod("BPABOUT")]
         public static void About()
         {
-            Guard("BPABOUT", () => System.Windows.Forms.MessageBox.Show("B+ CAD Tools " + App.Version + "\nExperimental pre-release for AutoCAD and Civil 3D 2021 to 2026.\nUpdates: github.com/Bplus-Software/Bplus-Cad-Tools\nSettings and log: " + Paths.Dir, "About B+ CAD Tools", System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Information));
+            Guard("BPABOUT", () => System.Windows.Forms.MessageBox.Show(Ar.T("B+ CAD Tools ") + App.Version + Ar.T("\nExperimental pre-release for AutoCAD and Civil 3D 2021 to 2026.\nUpdates: github.com/Bplus-Software/Bplus-Cad-Tools\nSettings and log: ") + Paths.Dir, Ar.T("About B+ CAD Tools"), System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Information));
         }
-        static void SetKind(MapKind k, string name) { Guard("BPMAP", () => { Config.Kind = k; Engine.RefreshNow(); Doc.Editor.WriteMessage("\n[B+] Map type: " + name + (Engine.On ? "" : ". The map is off: click Live map to show it.") + "\n"); }); }
-        static void SetOpacity(int p) { Guard("BPMAP", () => { Config.OpacityPercent = p; Engine.RefreshNow(); Doc.Editor.WriteMessage("\n[B+] Map opacity: " + p + "%\n"); }); }
+        static void SetKind(MapKind k, string name) { Guard("BPMAP", () => { Config.Kind = k; Engine.RefreshNow(); Doc.Editor.WriteMessage(Ar.T("\n[B+] Map type: ") + name + (Engine.On ? "" : Ar.T(". The map is off: click Live map to show it.")) + "\n"); }); }
+        static void SetOpacity(int p) { Guard("BPMAP", () => { Config.OpacityPercent = p; Engine.RefreshNow(); Doc.Editor.WriteMessage(Ar.T("\n[B+] Map opacity: ") + p + "%\n"); }); }
         [CommandMethod("BPMAPSAT")] public static void MapSat() { SetKind(MapKind.Satellite, "Satellite"); }
         [CommandMethod("BPMAPROAD")] public static void MapRoad() { SetKind(MapKind.Roadmap, "Roadmap"); }
         [CommandMethod("BPMAPHYB")] public static void MapHyb() { SetKind(MapKind.Hybrid, "Hybrid"); }

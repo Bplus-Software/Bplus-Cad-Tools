@@ -79,9 +79,9 @@ namespace BPlus.LiveMap
             UpdateInfo u;
             try { u = Task.Run(FetchAsync).GetAwaiter().GetResult(); Config.LastUpdateCheck = DateTime.UtcNow.ToString("o"); }
             catch (Exception e) { Log.Write("Update check: " + e); MessageBox.Show("Could not check for updates (" + Short(e) + "). Check the internet connection.", "B+ CAD Tools", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
-            if (u == null) { MessageBox.Show("No release was found on GitHub.", "B+ CAD Tools", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
-            if (!Updater.IsNewer(u, Current)) { MessageBox.Show("You have the newest version (" + Current + ").", "B+ CAD Tools", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
-            var r = MessageBox.Show("Version " + u.Version + (u.Prerelease ? " (experimental pre-release)" : "") + " is available. You have " + Current + ".\n\nDownload it now? The installer's SHA-256 is checked against the release's SHA256SUMS.txt before it starts. You must close AutoCAD and Civil 3D to finish the update.\n\n" + u.Page, "B+ CAD Tools update", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (u == null) { MessageBox.Show(Ar.T("No release was found on GitHub."), Ar.T("B+ CAD Tools"), MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
+            if (!Updater.IsNewer(u, Current)) { MessageBox.Show(Ar.T("You have the newest version (") + Current + ").", Ar.T("B+ CAD Tools"), MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
+            var r = MessageBox.Show(Ar.T("Version ") + u.Version + (u.Prerelease ? Ar.T(" (experimental pre-release)") : "") + Ar.T(" is available. You have ") + Current + Ar.T(".\n\nDownload it now? The installer's SHA-256 is checked against the release's SHA256SUMS.txt before it starts. You must close AutoCAD and Civil 3D to finish the update.\n\n") + u.Page, Ar.T("B+ CAD Tools update"), MessageBoxButtons.YesNo, MessageBoxIcon.Question);
             if (r != DialogResult.Yes) return;
             string dir = Path.Combine(Path.GetTempPath(), "BPlusCadTools"); Directory.CreateDirectory(dir);
             string exe = Path.Combine(dir, "BPlusCadTools-Setup-" + u.Version + ".exe");
@@ -99,12 +99,12 @@ namespace BPlus.LiveMap
             List<string> unsaved, saved;
             if (!CheckDrawings(out unsaved, out saved))
             {
-                MessageBox.Show("The update was NOT started: these drawings have unsaved changes.\n\n  " + string.Join("\n  ", unsaved) + "\n\nSave them (QSAVE), then run BPUPDATE again. The update closes AutoCAD, and unsaved work would be lost.", "B+ CAD Tools", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(Ar.T("The update was NOT started: these drawings have unsaved changes.\n\n  ") + string.Join("\n  ", unsaved) + Ar.T("\n\nSave them (QSAVE), then run BPUPDATE again. The update closes AutoCAD, and unsaved work would be lost."), Ar.T("B+ CAD Tools"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 Log.Write("Update refused, unsaved: " + string.Join("; ", unsaved)); return;
             }
-            var go = MessageBox.Show("Version " + u.Version + " is downloaded and its SHA-256 matches.\n\nInstall now? AutoCAD will close the normal way: it asks you to save any unsaved drawing, nothing is forced. The installer then finishes by itself and offers to open AutoCAD again.\n\nWindows SmartScreen may warn because the installer is not code-signed.", "B+ CAD Tools update", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            var go = MessageBox.Show(Ar.T("Version ") + u.Version + Ar.T(" is downloaded and its SHA-256 matches.\n\nInstall now? AutoCAD will close the normal way: it asks you to save any unsaved drawing, nothing is forced. The installer then finishes by itself and offers to open AutoCAD again.\n\nWindows SmartScreen may warn because the installer is not code-signed."), Ar.T("B+ CAD Tools update"), MessageBoxButtons.YesNo, MessageBoxIcon.Question);
             if (go != DialogResult.Yes) { Log.Write("Update installer kept for later: " + exe); return; }
-            if (!CheckDrawings(out unsaved, out saved)) { MessageBox.Show("The update was NOT started: a drawing was changed. Unsaved: " + string.Join(", ", unsaved) + ".\nSave it (QSAVE), then run BPUPDATE again.", "B+ CAD Tools", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+            if (!CheckDrawings(out unsaved, out saved)) { MessageBox.Show(Ar.T("The update was NOT started: a drawing was changed. Unsaved: ") + string.Join(", ", unsaved) + Ar.T(".\nSave it (QSAVE), then run BPUPDATE again."), Ar.T("B+ CAD Tools"), MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
             string args = "/CONFIRMED";
             try
             {
@@ -113,7 +113,7 @@ namespace BPlus.LiveMap
                 Log.Write("Reopen list written with " + saved.Count + " drawing(s).");
             }
             catch (Exception e) { Log.Write("Reopen list failed: " + e.Message); }
-            try { Process.Start(new ProcessStartInfo(exe, args) { UseShellExecute = true }); } catch (Exception e) { MessageBox.Show("Could not start the installer: " + e.Message + "\nIt is saved at " + exe, "B+ CAD Tools", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+            try { Process.Start(new ProcessStartInfo(exe, args) { UseShellExecute = true }); } catch (Exception e) { MessageBox.Show(Ar.T("Could not start the installer: ") + e.Message + Ar.T("\nIt is saved at ") + exe, Ar.T("B+ CAD Tools"), MessageBoxButtons.OK, MessageBoxIcon.Error); }
         }
         static string Short(Exception e) { while (e.InnerException != null) e = e.InnerException; return e.Message; }
     }
@@ -150,7 +150,7 @@ namespace BPlus.LiveMap
                 logb.Click += (s, e) => { try { Process.Start(new ProcessStartInfo(Paths.Dir) { UseShellExecute = true }); } catch { } };
                 ok.Click += (s, e) =>
                 {
-                    double h; if (!Theme.TryNum(th.Text, out h) || h <= 0 || h > 50) { MessageBox.Show(f, "Text height must be a number above zero and not more than 50 (drawing units, normally metres). A very big value makes every label and point text huge.", "B+ CAD Tools"); return; }
+                    double h; if (!Theme.TryNum(th.Text, out h) || h <= 0 || h > 50) { MessageBox.Show(f, Ar.T("Text height must be a number above zero and not more than 50 (drawing units, normally metres). A very big value makes every label and point text huge."), Ar.T("B+ CAD Tools")); return; }
                     Config.AutoUpdate = auto.Checked; Config.PointOrder = (string)ord.SelectedItem; Config.Decimals = (int)dec.Value; Config.TextHeight = h; f.DialogResult = DialogResult.OK;
                 };
                 cancel.Click += (s, e) => f.DialogResult = DialogResult.Cancel;

@@ -72,7 +72,7 @@ namespace BPlus.LiveMap
             Guard("BPCONTOUR", () =>
             {
                 var doc = Doc; var ed = doc.Editor; var db = doc.Database; var pre = Sel.Peek(ed);
-                var sr = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = "\nSelect points, 3D faces, 3D polylines, or a Civil 3D surface: " }, "POINT,3DFACE,POLYLINE,AECC_TIN_SURFACE,AECC_GRID_SURFACE", pre);
+                var sr = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = Ar.T("\nSelect points, 3D faces, 3D polylines, or a Civil 3D surface: ") }, Ar.T("POINT,3DFACE,POLYLINE,AECC_TIN_SURFACE,AECC_GRID_SURFACE"), pre);
                 if (sr.Status != PromptStatus.OK) return;
                 var ids = sr.Value.GetObjectIds(); Grid grid = null; List<Tri> tris = null; double zmin = double.MaxValue, zmax = double.MinValue, ex0 = double.MaxValue, ey0 = double.MaxValue, ex1 = double.MinValue, ey1 = double.MinValue; string found;
                 var sid = ids.FirstOrDefault(i => (i.ObjectClass.DxfName ?? "").IndexOf("SURFACE", StringComparison.OrdinalIgnoreCase) >= 0);
@@ -108,23 +108,23 @@ namespace BPlus.LiveMap
                         }
                         tr.Commit();
                     }
-                    if (pts.Count > MaxDelaunayPoints) { ed.WriteMessage("\n[B+] " + pts.Count + " points is too many for the built-in triangulation (limit " + MaxDelaunayPoints + "). Use 3D faces or a smaller selection.\n"); return; }
+                    if (pts.Count > MaxDelaunayPoints) { ed.WriteMessage("\n[B+] " + pts.Count + Ar.T(" points is too many for the built-in triangulation (limit ") + MaxDelaunayPoints + Ar.T("). Use 3D faces or a smaller selection.\n")); return; }
                     if (pts.Count >= 3) tris.AddRange(Sinks.Delaunay(pts));
-                    if (tris.Count == 0) { ed.WriteMessage("\n[B+] Need at least 3 points or some 3D faces.\n"); return; }
+                    if (tris.Count == 0) { ed.WriteMessage(Ar.T("\n[B+] Need at least 3 points or some 3D faces.\n")); return; }
                     foreach (var t in tris) { foreach (var z in new[] { t.Z1, t.Z2, t.Z3 }) { zmin = Math.Min(zmin, z); zmax = Math.Max(zmax, z); } foreach (var x in new[] { t.X1, t.X2, t.X3 }) { ex0 = Math.Min(ex0, x); ex1 = Math.Max(ex1, x); } foreach (var y in new[] { t.Y1, t.Y2, t.Y3 }) { ey0 = Math.Min(ey0, y); ey1 = Math.Max(ey1, y); } }
                     found = pts.Count + " point(s) and " + tris.Count + " triangle(s).  Heights " + zmin.ToString("F2", CultureInfo.InvariantCulture) + " to " + zmax.ToString("F2", CultureInfo.InvariantCulture) + " m.";
                 }
-                if (zmax - zmin < 1e-6) { ed.WriteMessage("\n[B+] All heights are the same: no contours.\n"); return; }
+                if (zmax - zmin < 1e-6) { ed.WriteMessage(Ar.T("\n[B+] All heights are the same: no contours.\n")); return; }
                 double diag = Math.Sqrt((ex1 - ex0) * (ex1 - ex0) + (ey1 - ey0) * (ey1 - ey0)), scale = DrawingScale(db);
                 double autoTh = scale > 1.0001 ? 0.0025 * scale : ProfileMath.NiceStep(diag / 250.0);
                 var ch = ContourUi.Ask(found, Contour.SuggestInterval(zmax - zmin), tris != null, autoTh); if (ch == null) return;
                 var levels = Contour.Levels(zmin, zmax, ch.Interval);
-                if (levels.Count == 0) { ed.WriteMessage("\n[B+] No contour level falls inside the heights with this interval.\n"); return; }
+                if (levels.Count == 0) { ed.WriteMessage(Ar.T("\n[B+] No contour level falls inside the heights with this interval.\n")); return; }
                 var lines = new List<ContourLine>();
                 foreach (var l in levels) lines.AddRange(grid != null ? Contour.FromGrid(grid, l) : Contour.FromTris(tris, l, ch.MaxEdge));
-                if (lines.Count == 0) { ed.WriteMessage("\n[B+] No contour lines were found (a long triangle limit may have removed them).\n"); return; }
+                if (lines.Count == 0) { ed.WriteMessage(Ar.T("\n[B+] No contour lines were found (a long triangle limit may have removed them).\n")); return; }
                 double total = lines.Sum(x => x.Length);
-                if (lines.Count > 2000 && MessageBox.Show("This will draw " + lines.Count + " lines (" + total.ToString("F0", CultureInfo.InvariantCulture) + " m in total). Continue? A bigger interval gives fewer lines.", "B+ CAD Tools", MessageBoxButtons.YesNo) != DialogResult.Yes) return;
+                if (lines.Count > 2000 && MessageBox.Show(Ar.T("This will draw ") + lines.Count + Ar.T(" lines (") + total.ToString("F0", CultureInfo.InvariantCulture) + Ar.T(" m in total). Continue? A bigger interval gives fewer lines."), Ar.T("B+ CAD Tools"), MessageBoxButtons.YesNo) != DialogResult.Yes) return;
                 int made = 0, labels = 0; double th = ch.TextH;
                 using (doc.LockDocument())
                 using (var tr = db.TransactionManager.StartTransaction())
@@ -151,7 +151,7 @@ namespace BPlus.LiveMap
                     }
                     tr.Commit();
                 }
-                ed.WriteMessage("\n[B+] Contours: " + made + " lines (" + total.ToString("F0", CultureInfo.InvariantCulture) + " m), " + labels + " labels, interval " + ch.Interval.ToString("0.###", CultureInfo.InvariantCulture) + " m, from " + levels[0].ToString("F2", CultureInfo.InvariantCulture) + " to " + levels[levels.Count - 1].ToString("F2", CultureInfo.InvariantCulture) + " m. Layers BP-CONTOUR-INDEX, BP-CONTOUR, BP-CONTOUR-TEXT.\n");
+                ed.WriteMessage(Ar.T("\n[B+] Contours: ") + made + Ar.T(" lines (") + total.ToString("F0", CultureInfo.InvariantCulture) + " m), " + labels + Ar.T(" labels, interval ") + ch.Interval.ToString("0.###", CultureInfo.InvariantCulture) + Ar.T(" m, from ") + levels[0].ToString("F2", CultureInfo.InvariantCulture) + " to " + levels[levels.Count - 1].ToString("F2", CultureInfo.InvariantCulture) + Ar.T(" m. Layers BP-CONTOUR-INDEX, BP-CONTOUR, BP-CONTOUR-TEXT.\n"));
             });
         }
     }

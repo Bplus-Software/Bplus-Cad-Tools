@@ -52,9 +52,9 @@ namespace BPlus.LiveMap
                 }
                 else if (p3 != null) foreach (ObjectId vid in p3) { var pv = (PolylineVertex3d)tr.GetObject(vid, OpenMode.ForRead); pts.Add(new[] { pv.Position.X, pv.Position.Y, pv.Position.Z }); }
             }
-            if (pts.Count > MaxDelaunayPoints) { ed.WriteMessage("\n[B+] " + pts.Count + " points is too many for the built-in triangulation (limit " + MaxDelaunayPoints + "). Use 3D faces or a smaller selection.\n"); return null; }
+            if (pts.Count > MaxDelaunayPoints) { ed.WriteMessage("\n[B+] " + pts.Count + Ar.T(" points is too many for the built-in triangulation (limit ") + MaxDelaunayPoints + Ar.T("). Use 3D faces or a smaller selection.\n")); return null; }
             if (pts.Count >= 3) tris.AddRange(Sinks.Delaunay(pts));
-            if (tris.Count == 0) { ed.WriteMessage("\n[B+] " + name + ": need at least 3 points or some 3D faces.\n"); return null; }
+            if (tris.Count == 0) { ed.WriteMessage("\n[B+] " + name + Ar.T(": need at least 3 points or some 3D faces.\n")); return null; }
             var s = new TriSurface(tris);
             return new Elev { Z = s.Z, HasBounds = true, MinX = s.MinX, MinY = s.MinY, MaxX = s.MaxX, MaxY = s.MaxY, Note = name + ": " + pts.Count + " point(s), " + tris.Count + " triangle(s). Long thin triangles at the edge of a point cloud can create false slopes." };
         }
@@ -76,18 +76,18 @@ namespace BPlus.LiveMap
                 {
                     if (key == "ex_surf" || key == "cmp_surf")
                     {
-                        var peo = new PromptEntityOptions("\nPick the Civil 3D surface: "); var per = ed.GetEntity(peo); if (per.Status != PromptStatus.OK) return null;
-                        if (!IsSurface(per.ObjectId)) { ed.WriteMessage("\n[B+] That is not a Civil 3D surface. Surfaces exist only in Civil 3D: start Civil 3D (not plain AutoCAD) for this.\n"); return null; }
+                        var peo = new PromptEntityOptions(Ar.T("\nPick the Civil 3D surface: ")); var per = ed.GetEntity(peo); if (per.Status != PromptStatus.OK) return null;
+                        if (!IsSurface(per.ObjectId)) { ed.WriteMessage(Ar.T("\n[B+] That is not a Civil 3D surface. Surfaces exist only in Civil 3D: start Civil 3D (not plain AutoCAD) for this.\n")); return null; }
                         if (key == "ex_surf") exSurf = per.ObjectId; else cmpSurf = per.ObjectId;
                         return SurfaceName(doc, per.ObjectId) + "  (selected)";
                     }
                     if (key == "poly")
                     {
-                        var peo = new PromptEntityOptions("\nPick the closed polyline that limits the area: "); peo.SetRejectMessage("\nOnly a polyline."); peo.AddAllowedClass(typeof(AcPoly), true);
+                        var peo = new PromptEntityOptions(Ar.T("\nPick the closed polyline that limits the area: ")); peo.SetRejectMessage(Ar.T("\nOnly a polyline.")); peo.AddAllowedClass(typeof(AcPoly), true);
                         var per = ed.GetEntity(peo); if (per.Status != PromptStatus.OK) return null;
-                        using (var tr0 = doc.Database.TransactionManager.StartTransaction()) { var pl0 = (AcPoly)tr0.GetObject(per.ObjectId, OpenMode.ForRead); if (!pl0.Closed) { ed.WriteMessage("\n[B+] The polyline must be closed.\n"); return null; } polyId = per.ObjectId; return "1 polyline (" + pl0.Area.ToString("N1", inv) + " m\u00B2)"; }
+                        using (var tr0 = doc.Database.TransactionManager.StartTransaction()) { var pl0 = (AcPoly)tr0.GetObject(per.ObjectId, OpenMode.ForRead); if (!pl0.Closed) { ed.WriteMessage(Ar.T("\n[B+] The polyline must be closed.\n")); return null; } polyId = per.ObjectId; return Ar.T("1 polyline (") + pl0.Area.ToString("N1", inv) + " m\u00B2)"; }
                     }
-                    var psr = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = "\nSelect points, 3D faces and 3D polylines" }, "POINT,3DFACE,POLYLINE", none); if (psr.Status != PromptStatus.OK) return null;
+                    var psr = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = Ar.T("\nSelect points, 3D faces and 3D polylines") }, Ar.T("POINT,3DFACE,POLYLINE"), none); if (psr.Status != PromptStatus.OK) return null;
                     var ids = psr.Value.GetObjectIds(); if (key == "ex_pts") exPts = ids; else cmpPts = ids; return ids.Length + " object(s) selected";
                 };
                 var ch = CutFillUi.Ask(select, status, startEx); if (ch == null) return;
@@ -97,20 +97,20 @@ namespace BPlus.LiveMap
                     // existing ground
                     if (ch.Existing == 0)
                     {
-                        ex = CivilElev(tr, exSurf, "Existing ground"); if (ex == null) { ed.WriteMessage("\n[B+] This object has no elevation method. Surfaces work only in Civil 3D, not in plain AutoCAD.\n"); return; }
+                        ex = CivilElev(tr, exSurf, Ar.T("Existing ground")); if (ex == null) { ed.WriteMessage(Ar.T("\n[B+] This object has no elevation method. Surfaces work only in Civil 3D, not in plain AutoCAD.\n")); return; }
                     }
                     else { ex = TrisElev(tr, ed, exPts, "Existing ground"); if (ex == null) return; }
                     // comparison
                     string what;
-                    if (ch.Proposed == 0) { pr = CivilElev(tr, cmpSurf, "Compared with"); if (pr == null) { ed.WriteMessage("\n[B+] No elevation method on that surface. Surfaces work only in Civil 3D.\n"); return; } what = "another surface"; }
+                    if (ch.Proposed == 0) { pr = CivilElev(tr, cmpSurf, Ar.T("Compared with")); if (pr == null) { ed.WriteMessage(Ar.T("\n[B+] No elevation method on that surface. Surfaces work only in Civil 3D.\n")); return; } what = Ar.T("another surface"); }
                     else if (ch.Proposed == 1) { pr = TrisElev(tr, ed, cmpPts, "Compared with"); if (pr == null) return; what = "selected points / faces"; }
                     else if (ch.Proposed == 2) { double lz = ch.Level; pr = new Elev { Z = (x, y) => lz, Note = "Compared with: flat level " + lz.ToString("F3", inv) + " m." }; what = "flat level " + lz.ToString("F3", inv) + " m"; }
                     else
                     {
-                        var p1 = ed.GetPoint("\nPoint on the plane: "); if (p1.Status != PromptStatus.OK) return;
-                        var o2 = new PromptPointOptions("\nPoint in the uphill direction: ") { UseBasePoint = true, BasePoint = p1.Value }; var p2 = ed.GetPoint(o2); if (p2.Status != PromptStatus.OK) return;
-                        double dx = p2.Value.X - p1.Value.X, dy = p2.Value.Y - p1.Value.Y, L = Math.Sqrt(dx * dx + dy * dy); if (L < 1e-9) { ed.WriteMessage("\n[B+] The two points are the same.\n"); return; }
-                        var po = new PromptDoubleOptions("\nLevel (Z) of the plane at the first point: ") { AllowNone = false }; var pz = ed.GetDouble(po); if (pz.Status != PromptStatus.OK) return;
+                        var p1 = ed.GetPoint(Ar.T("\nPoint on the plane: ")); if (p1.Status != PromptStatus.OK) return;
+                        var o2 = new PromptPointOptions(Ar.T("\nPoint in the uphill direction: ")) { UseBasePoint = true, BasePoint = p1.Value }; var p2 = ed.GetPoint(o2); if (p2.Status != PromptStatus.OK) return;
+                        double dx = p2.Value.X - p1.Value.X, dy = p2.Value.Y - p1.Value.Y, L = Math.Sqrt(dx * dx + dy * dy); if (L < 1e-9) { ed.WriteMessage(Ar.T("\n[B+] The two points are the same.\n")); return; }
+                        var po = new PromptDoubleOptions(Ar.T("\nLevel (Z) of the plane at the first point: ")) { AllowNone = false }; var pz = ed.GetDouble(po); if (pz.Status != PromptStatus.OK) return;
                         double x0 = p1.Value.X, y0 = p1.Value.Y, z0 = pz.Value, g = ch.Grade / 100.0, ux = dx / L, uy = dy / L;
                         pr = new Elev { Z = (x, y) => z0 + g * ((x - x0) * ux + (y - y0) * uy), Note = "Compared with: plane, level " + z0.ToString("F3", inv) + " m at the first point, grade " + ch.Grade.ToString("0.###", inv) + " % uphill." };
                         what = "plane at " + ch.Grade.ToString("0.###", inv) + " %";
@@ -120,7 +120,7 @@ namespace BPlus.LiveMap
                     if (pr.HasBounds) { minx = Math.Max(minx, pr.MinX); miny = Math.Max(miny, pr.MinY); maxx = Math.Min(maxx, pr.MaxX); maxy = Math.Min(maxy, pr.MaxY); }
                     if (ch.Area == 1)
                     {
-                        var pl = (AcPoly)tr.GetObject(polyId, OpenMode.ForRead); if (!pl.Closed) { ed.WriteMessage("\n[B+] The polyline must be closed.\n"); return; }
+                        var pl = (AcPoly)tr.GetObject(polyId, OpenMode.ForRead); if (!pl.Closed) { ed.WriteMessage(Ar.T("\n[B+] The polyline must be closed.\n")); return; }
                         var poly = new List<double[]>(); int n = pl.NumberOfVertices;
                         for (int i = 0; i < n; i++)
                         {
@@ -132,18 +132,18 @@ namespace BPlus.LiveMap
                     }
                     else areaText = "where the two overlap";
                     tr.Commit();
-                    if (maxx <= minx || maxy <= miny) { ed.WriteMessage("\n[B+] The two surfaces and the area do not overlap.\n"); return; }
-                    ed.WriteMessage("\n[B+] Calculating cut and fill...\n");
+                    if (maxx <= minx || maxy <= miny) { ed.WriteMessage(Ar.T("\n[B+] The two surfaces and the area do not overlap.\n")); return; }
+                    ed.WriteMessage(Ar.T("\n[B+] Calculating cut and fill...\n"));
                     res = CutFill.Compute(ex.Z, pr.Z, minx, miny, maxx, maxy, ch.Cell, inside, ch.Swell);
                     info = "Compared with " + what + ". Area: " + areaText + ". Grid " + res.Cell.ToString("0.###", inv) + " m, " + res.UsedCells + " cells used.";
                     note = ex.Note + " " + pr.Note;
                     if (res.Cell > ch.Cell + 1e-9) note += " Grid cell was enlarged to " + res.Cell.ToString("0.###", inv) + " m to keep it fast.";
-                    if (res.UsedCells == 0) { System.Windows.Forms.MessageBox.Show("No place was found where both have an elevation. Check the area and the surfaces.", "B+ CAD Tools"); return; }
+                    if (res.UsedCells == 0) { System.Windows.Forms.MessageBox.Show(Ar.T("No place was found where both have an elevation. Check the area and the surfaces."), Ar.T("B+ CAD Tools")); return; }
                     note += " Cell-centre method: the result changes a little with the cell size and may differ slightly from Civil 3D volume reports.";
                 }
-                ed.WriteMessage("\n[B+] Cut " + res.CutVolume.ToString("N1", inv) + " m3, fill " + res.FillVolume.ToString("N1", inv) + " m3, net " + res.Net.ToString("N1", inv) + " m3 (" + (res.Net >= 0 ? "cut" : "fill") + ").\n");
+                ed.WriteMessage(Ar.T("\n[B+] Cut ") + res.CutVolume.ToString("N1", inv) + Ar.T(" m3, fill ") + res.FillVolume.ToString("N1", inv) + Ar.T(" m3, net ") + res.Net.ToString("N1", inv) + " m3 (" + (res.Net >= 0 ? Ar.T("cut") : Ar.T("fill")) + ").\n");
                 if (!CutFillUi.Result(res, info, note)) return;
-                var pp = ed.GetPoint("\nPick the corner of the table: "); if (pp.Status != PromptStatus.OK) return;
+                var pp = ed.GetPoint(Ar.T("\nPick the corner of the table: ")); if (pp.Status != PromptStatus.OK) return;
                 using (doc.LockDocument())
                 using (var tr = doc.Database.TransactionManager.StartTransaction())
                 {
@@ -158,7 +158,7 @@ namespace BPlus.LiveMap
                     var mt = new MText { Contents = text, Location = pp.Value, TextHeight = Config.TextHeight, LayerId = lay }; mt.SetDatabaseDefaults(doc.Database); mt.Contents = text; mt.Location = pp.Value; mt.TextHeight = Config.TextHeight; mt.LayerId = lay;
                     ms.AppendEntity(mt); tr.AddNewlyCreatedDBObject(mt, true); tr.Commit();
                 }
-                ed.WriteMessage("\n[B+] Table placed on layer BP-CUTFILL. One UNDO removes it.\n");
+                ed.WriteMessage(Ar.T("\n[B+] Table placed on layer BP-CUTFILL. One UNDO removes it.\n"));
             });
         }
     }

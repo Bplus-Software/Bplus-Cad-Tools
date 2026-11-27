@@ -63,14 +63,14 @@ namespace BPlus.LiveMap
                 lv.SelectedIndexChanged += (s, e) => show(lv.SelectedItems.Count > 0 ? lv.SelectedItems[0].Tag as CoordSys : null);
                 pickBtn.Click += (s, e) =>
                 {
-                    f.Hide(); try { var ed = doc.Editor; var r = ed.GetPoint("\nPick a point of your drawing: "); if (r.Status == PromptStatus.OK) picked = new[] { r.Value.X, r.Value.Y }; } catch { }
+                    f.Hide(); try { var ed = doc.Editor; var r = ed.GetPoint(Ar.T("\nPick a point of your drawing: ")); if (r.Status == PromptStatus.OK) picked = new[] { r.Value.X, r.Value.Y }; } catch { }
                     f.Show(); f.Activate(); show(lv.SelectedItems.Count > 0 ? lv.SelectedItems[0].Tag as CoordSys : null);
                 };
                 sugBtn.Click += (s, e) =>
                 {
-                    if (picked == null) { MessageBox.Show(f, "Pick a point first.", "B+ CAD Tools"); return; }
+                    if (picked == null) { MessageBox.Show(f, Ar.T("Pick a point first."), Ar.T("B+ CAD Tools")); return; }
                     var g = CsSuggest.Suggest(picked[0], picked[1], unit);
-                    if (g.Count == 0) { MessageBox.Show(f, "No system puts this point in Saudi Arabia or Egypt. Check the drawing units and the numbers.", "B+ CAD Tools"); return; }
+                    if (g.Count == 0) { MessageBox.Show(f, Ar.T("No system puts this point in Saudi Arabia or Egypt. Check the drawing units and the numbers."), Ar.T("B+ CAD Tools")); return; }
                     only = new HashSet<int>(g.Select(x => x.Cs.Epsg)); q.Text = ""; refresh();
                     sugLbl.Text = g.Count + " system(s) fit. Check one against the live map before you trust it.";
                 };
@@ -78,7 +78,7 @@ namespace BPlus.LiveMap
                 f.Controls.Add(Theme.Lbl("The choice is saved inside this drawing. The live map, KML import / export and", 16, 520, 628, true));
                 f.Controls.Add(Theme.Lbl("Pick coordinates all use it. Change it later with BPGMAPCS.", 16, 542, 628, true));
                 var ok = Theme.Btn("Apply", 440, 596, 110, true); var cancel = Theme.Btn("Cancel", 560, 596, 84); int result = 0;
-                ok.Click += (s, e) => { if (lv.SelectedItems.Count == 0) { MessageBox.Show(f, "Select a system in the list first.", "B+ CAD Tools"); return; } result = ((CoordSys)lv.SelectedItems[0].Tag).Epsg; f.DialogResult = DialogResult.OK; };
+                ok.Click += (s, e) => { if (lv.SelectedItems.Count == 0) { MessageBox.Show(f, Ar.T("Select a system in the list first."), Ar.T("B+ CAD Tools")); return; } result = ((CoordSys)lv.SelectedItems[0].Tag).Epsg; f.DialogResult = DialogResult.OK; };
                 cancel.Click += (s, e) => f.DialogResult = DialogResult.Cancel; f.Controls.AddRange(new Control[] { ok, cancel }); f.AcceptButton = ok; f.CancelButton = cancel;
                 refresh(); show(lv.SelectedItems.Count > 0 ? lv.SelectedItems[0].Tag as CoordSys : null);
                 return AcApp.ShowModalDialog(f) == DialogResult.OK ? result : 0;

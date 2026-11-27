@@ -42,7 +42,7 @@ namespace BPlus.LiveMap
             var fi = new FileInfo(main); if (fi.IsReadOnly) { Say("The main menu file is read-only. The tab built in code is used instead."); Write(App.Version); return; }
             // tell the user, with a way to say no
             string backup = Path.Combine(BackupDir, Path.GetFileNameWithoutExtension(main) + "-before-BPlus-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".cuix");
-            var r = MessageBox.Show("B+ CAD Tools will add its ribbon tab to every workspace in your main menu file:\n\n" + main + "\n\nA backup copy is saved first:\n" + backup + "\n\nThis keeps the tab when you switch workspace. The command BPRIBBONRESET undoes it.\n\nOK = do it now.   Cancel = skip (type BPRIBBONSETUP later).", "B+ CAD Tools - ribbon setup", MessageBoxButtons.OKCancel, MessageBoxIcon.Information);
+            var r = MessageBox.Show(Ar.T("B+ CAD Tools will add its ribbon tab to every workspace in your main menu file:\n\n") + main + Ar.T("\n\nA backup copy is saved first:\n") + backup + Ar.T("\n\nThis keeps the tab when you switch workspace. The command BPRIBBONRESET undoes it.\n\nOK = do it now.   Cancel = skip (type BPRIBBONSETUP later)."), Ar.T("B+ CAD Tools - ribbon setup"), MessageBoxButtons.OKCancel, MessageBoxIcon.Information);
             if (r != DialogResult.OK) { Write("off"); Say("Ribbon setup skipped. Type BPRIBBONSETUP to do it later."); return; }
             File.Copy(main, backup, true); Say("Backup saved: " + backup);
             string err = BuildPartial(); if (err != null) { Say("Could not build the menu file: " + err + ". Nothing in your main menu file was changed."); Write(App.Version); return; }
@@ -136,7 +136,7 @@ namespace BPlus.LiveMap
 
     public partial class Commands
     {
-        [CommandMethod("BPRIBBON")] public static void RibbonAgain() { Guard("BPRIBBON", () => { bool ok = Ribbon.AddNow(); AcApp.DocumentManager.MdiActiveDocument.Editor.WriteMessage(ok ? "\n[B+] The B+ CAD Tools tab is in the ribbon.\n" : "\n[B+] Could not add the tab: the ribbon is not ready.\n"); }); }
+        [CommandMethod("BPRIBBON")] public static void RibbonAgain() { Guard("BPRIBBON", () => { bool ok = Ribbon.AddNow(); AcApp.DocumentManager.MdiActiveDocument.Editor.WriteMessage(ok ? Ar.T("\n[B+] The B+ CAD Tools tab is in the ribbon.\n") : Ar.T("\n[B+] Could not add the tab: the ribbon is not ready.\n")); }); }
         [CommandMethod("BPRIBBONSETUP")] public static void RibbonSetup() { Guard("BPRIBBONSETUP", () => CuiSetup.Run(true)); }
         [CommandMethod("BPRIBBONRESET")] public static void RibbonReset() { Guard("BPRIBBONRESET", () => CuiSetup.Reset()); }
     }

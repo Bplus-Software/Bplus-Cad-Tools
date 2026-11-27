@@ -44,8 +44,8 @@ namespace BPlus.LiveMap
                 {
                     double v1, v2, v3; Func<string, double> p = t => double.TryParse(t.Trim().Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out v3) ? v3 : -1;
                     v1 = p(d.Text); v2 = p(a.Text); v3 = p(c.Text);
-                    double v4 = 0; if (sp.Text.Trim().ToLowerInvariant() != "auto" && sp.Text.Trim().Length > 0) { v4 = p(sp.Text); if (v4 <= 0) { MessageBox.Show(f, "Arrow spacing must be a number above 0, or auto.", "B+ CAD Tools"); return; } }
-                    if (v1 < 0 || v2 < 0 || v3 <= 0) { MessageBox.Show(f, "Depth and area must be numbers (0 or more), the grid cell above 0.", "B+ CAD Tools"); return; }
+                    double v4 = 0; if (sp.Text.Trim().ToLowerInvariant() != Ar.T("auto") && sp.Text.Trim().Length > 0) { v4 = p(sp.Text); if (v4 <= 0) { MessageBox.Show(f, Ar.T("Arrow spacing must be a number above 0, or auto."), Ar.T("B+ CAD Tools")); return; } }
+                    if (v1 < 0 || v2 < 0 || v3 <= 0) { MessageBox.Show(f, Ar.T("Depth and area must be numbers (0 or more), the grid cell above 0."), Ar.T("B+ CAD Tools")); return; }
                     res = new SinkChoice { Source = r[0].Checked ? 0 : r[1].Checked ? 1 : 2, MinDepth = v1, MinArea = v2, Cell = v3, Point = k1.Checked, Leader = k2.Checked, Outline = k3.Checked, Low = k4.Checked, Dir = k5.Checked, Spacing = v4 }; f.DialogResult = DialogResult.OK;
                 };
                 cancel.Click += (s, e) => f.DialogResult = DialogResult.Cancel;

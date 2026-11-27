@@ -48,6 +48,7 @@ namespace BPlus.LiveMap
         {
             var f = new Form { Text = title, BackColor = Bar, ForeColor = Text, Font = new Font("Segoe UI", 9f), FormBorderStyle = FormBorderStyle.FixedDialog, MaximizeBox = false, MinimizeBox = false, StartPosition = FormStartPosition.CenterScreen, ClientSize = new Size(w, h), ShowInTaskbar = false };
             DarkTitle(f);
+            f.Shown += (s0, e0) => { }; f.Load += (s0, e0) => Ar.Form(f);
             return f;
         }
         /// <summary>Sizes a dialog from its design numbers (taken before scaling) times the real screen scale, twice (Load and Shown), capped to the working area. Content never depends on measuring scaled controls.</summary>

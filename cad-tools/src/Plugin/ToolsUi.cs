@@ -107,7 +107,7 @@ namespace BPlus.LiveMap
                 var ok = Theme.Btn("Create", 262, 456, 90, true); var cancel = Theme.Btn("Cancel", 360, 456, 90);
                 ok.Click += (s, e) =>
                 {
-                    double h; if (!double.TryParse(th.Text.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out h) || h <= 0) { MessageBox.Show(f, "Text height must be a number above zero.", "B+ CAD Tools"); return; }
+                    double h; if (!double.TryParse(th.Text.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out h) || h <= 0) { MessageBox.Show(f, Ar.T("Text height must be a number above zero."), Ar.T("B+ CAD Tools")); return; }
                     c.TextH = h; c.Decimals = (int)dec.Value; c.Arrow = arrow.Checked; c.Centre = st.SelectedIndex == 1; c.Z = z.Checked; c.What = rb[0].Checked ? "len" : rb[1].Checked ? "area" : rb[2].Checked ? "both" : rb[4].Checked ? "coord" : "auto"; f.DialogResult = DialogResult.OK;
                 };
                 cancel.Click += (s, e) => f.DialogResult = DialogResult.Cancel;

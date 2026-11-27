@@ -108,12 +108,12 @@ namespace BPlus.LiveMap
             Guard("BPPARKING", () =>
             {
                 var doc = Doc; var ed = doc.Editor; var db = doc.Database;
-                var eo = new PromptEntityOptions("\nSelect the line the stalls start from (curb or edge: polyline, line or arc). The stalls follow its direction: "); eo.SetRejectMessage("\nOnly a polyline, line or arc."); eo.AddAllowedClass(typeof(Curve), false);
+                var eo = new PromptEntityOptions(Ar.T("\nSelect the line the stalls start from (curb or edge: polyline, line or arc). The stalls follow its direction: ")); eo.SetRejectMessage(Ar.T("\nOnly a polyline, line or arc.")); eo.AddAllowedClass(typeof(Curve), false);
                 var er = ed.GetEntity(eo); if (er.Status != PromptStatus.OK) return;
                 double length; using (var tr = db.TransactionManager.StartTransaction()) { var cv = (Curve)tr.GetObject(er.ObjectId, OpenMode.ForRead); length = cv.GetDistanceAtParameter(cv.EndParam); tr.Commit(); }
                 var pr = ParkingUi.Presets(); ParkingUi.Choice ch; if (!ParkingUi.Ask(length, pr, out ch)) return;
                 var p = pr[ch.Type]; int fit = ParkingMath.Fit(length, p), n = ch.Fill ? fit : Math.Min(ch.Count, fit);
-                if (n < 1) { ed.WriteMessage("\n[B+] The line (" + length.ToString("F2", CultureInfo.InvariantCulture) + " m) is shorter than one stall (" + p.Pitch.ToString("F2", CultureInfo.InvariantCulture) + " m).\n"); return; }
+                if (n < 1) { ed.WriteMessage(Ar.T("\n[B+] The line (") + length.ToString("F2", CultureInfo.InvariantCulture) + Ar.T(" m) is shorter than one stall (") + p.Pitch.ToString("F2", CultureInfo.InvariantCulture) + " m).\n"); return; }
                 int made = 0; double th = Math.Min(Config.TextHeight, Math.Max(0.3, p.Width * 0.5));
                 using (doc.LockDocument())
                 using (var tr = db.TransactionManager.StartTransaction())
@@ -146,11 +146,11 @@ namespace BPlus.LiveMap
                             double off = (ch.Left ? 1 : -1) * (p.Depth + p.Aisle);
                             foreach (DBObject o in cv.GetOffsetCurves(off)) { var en = o as Entity; if (en != null) add(en); }
                         }
-                        catch (System.Exception ex) { ed.WriteMessage("\n[B+] The aisle edge line could not be drawn: " + ex.Message + "\n"); }
+                        catch (System.Exception ex) { ed.WriteMessage(Ar.T("\n[B+] The aisle edge line could not be drawn: ") + ex.Message + "\n"); }
                     }
                     tr.Commit();
                 }
-                ed.WriteMessage("\n[B+] " + n + " " + p.Name + " stall(s) drawn on layer B+_PARKING, " + p.Width.ToString("0.##", CultureInfo.InvariantCulture) + " x " + p.Length.ToString("0.##", CultureInfo.InvariantCulture) + " m, " + (p.Pitch * n).ToString("F2", CultureInfo.InvariantCulture) + " m of the " + length.ToString("F2", CultureInfo.InvariantCulture) + " m line used" + (ch.Fill ? "; " + (length - p.Pitch * n).ToString("F2", CultureInfo.InvariantCulture) + " m left over (less than one stall)" : "") + (ch.Count > fit && !ch.Fill ? "; only " + fit + " fit, you asked for " + ch.Count : "") + ". On a curved line each stall follows the chord between its two curb points.\n");
+                ed.WriteMessage("\n[B+] " + n + " " + p.Name + Ar.T(" stall(s) drawn on layer B+_PARKING, ") + p.Width.ToString("0.##", CultureInfo.InvariantCulture) + " x " + p.Length.ToString("0.##", CultureInfo.InvariantCulture) + " m, " + (p.Pitch * n).ToString("F2", CultureInfo.InvariantCulture) + Ar.T(" m of the ") + length.ToString("F2", CultureInfo.InvariantCulture) + Ar.T(" m line used") + (ch.Fill ? "; " + (length - p.Pitch * n).ToString("F2", CultureInfo.InvariantCulture) + Ar.T(" m left over (less than one stall)") : "") + (ch.Count > fit && !ch.Fill ? Ar.T("; only ") + fit + Ar.T(" fit, you asked for ") + ch.Count : "") + Ar.T(". On a curved line each stall follows the chord between its two curb points.\n"));
             });
         }
     }

@@ -204,7 +204,7 @@ namespace BPlus.LiveMap
             Guard("BPPLOT", () =>
             {
                 var doc = Doc; var ed = doc.Editor; var db = doc.Database; var inv = CultureInfo.InvariantCulture;
-                if (PlotFactory.ProcessPlotState != ProcessPlotState.NotPlotting) { ed.WriteMessage("\n[B+] AutoCAD is plotting right now. Wait for it to finish.\n"); return; }
+                if (PlotFactory.ProcessPlotState != ProcessPlotState.NotPlotting) { ed.WriteMessage(Ar.T("\n[B+] AutoCAD is plotting right now. Wait for it to finish.\n")); return; }
                 Log.Write("BPPLOT: start"); double unit = DrawingCs.UnitToMetre(db); string drawing = Path.GetFileNameWithoutExtension(doc.Name);
                 var rows = new List<LayoutRow>();
                 using (var tr = db.TransactionManager.StartTransaction())
@@ -214,13 +214,13 @@ namespace BPlus.LiveMap
                     Log.Write("BPPLOT: reading " + list.Count + " layouts"); foreach (var lo in list.OrderBy(l => l.TabOrder)) rows.Add(new LayoutRow { Name = lo.LayoutName, Setup = string.IsNullOrEmpty(lo.PlotSettingsName) ? "(none)" : lo.PlotSettingsName, Paper = MediaText(lo), Scale = ScaleText(lo, unit), Canon = SafeCanon(lo) });
                     tr.Commit();
                 }
-                if (rows.Count == 0) { ed.WriteMessage("\n[B+] This drawing has no layouts (only the Model tab).\n"); return; }
+                if (rows.Count == 0) { ed.WriteMessage(Ar.T("\n[B+] This drawing has no layouts (only the Model tab).\n")); return; }
                 string folder = Path.GetDirectoryName(doc.Name); if (string.IsNullOrEmpty(folder) || !Directory.Exists(folder)) folder = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
                 try
                 {
                     if (Convert.ToInt32(AcApp.GetSystemVariable("DBMOD")) != 0)
                     {
-                        var r = System.Windows.Forms.MessageBox.Show("This drawing has unsaved changes.\r\n\r\nPlotting talks to the printer drivers, and a driver problem can close AutoCAD without warning.\r\nSave the drawing first?", "B+ CAD Tools - Plot layouts", System.Windows.Forms.MessageBoxButtons.YesNoCancel);
+                        var r = System.Windows.Forms.MessageBox.Show(Ar.T("This drawing has unsaved changes.\r\n\r\nPlotting talks to the printer drivers, and a driver problem can close AutoCAD without warning.\r\nSave the drawing first?"), Ar.T("B+ CAD Tools - Plot layouts"), System.Windows.Forms.MessageBoxButtons.YesNoCancel);
                         if (r == System.Windows.Forms.DialogResult.Cancel) return;
                         if (r == System.Windows.Forms.DialogResult.Yes) { doc.Database.SaveAs(doc.Name, true, DwgVersion.Current, doc.Database.SecurityParameters); }
                     }
@@ -230,7 +230,7 @@ namespace BPlus.LiveMap
                 if (ch.Pdf && string.IsNullOrEmpty(ch.Device)) ch.Device = PdfDevice;
                 bool ms = ch.Pdf && ch.OwnSetup == false && ch.Device != null && ch.Device.IndexOf("microsoft", StringComparison.OrdinalIgnoreCase) >= 0; if (ms) ch.Combined = false;
                 if (ms) MsPdfWatch.Start(120);
-                if (ch.Pdf) { try { Directory.CreateDirectory(ch.Folder); } catch (System.Exception ex) { ed.WriteMessage("\n[B+] Cannot use that folder: " + ex.Message + "\n"); return; } }
+                if (ch.Pdf) { try { Directory.CreateDirectory(ch.Folder); } catch (System.Exception ex) { ed.WriteMessage(Ar.T("\n[B+] Cannot use that folder: ") + ex.Message + "\n"); return; } }
 
                 string phase = ""; var done = new List<string>(); var failed = new List<string>(); object oldBg = null; string oldLayout = null;
                 try { oldBg = AcApp.GetSystemVariable("BACKGROUNDPLOT"); AcApp.SetSystemVariable("BACKGROUNDPLOT", 0); } catch { }
@@ -270,7 +270,7 @@ namespace BPlus.LiveMap
                                         for (int i = 0; i < pis.Count; i++)
                                         {
                                             if (EscPressed()) { failed.Add("Stopped with Esc before " + pis[i].Key); break; }
-                                            ed.WriteMessage("\n[B+] Plotting " + (i + 1) + " of " + pis.Count + ": " + pis[i].Key);
+                                            ed.WriteMessage(Ar.T("\n[B+] Plotting ") + (i + 1) + " of " + pis.Count + ": " + pis[i].Key);
                                             try { LayoutManager.Current.CurrentLayout = pis[i].Key; } catch { }
                                             var pp = new PlotPageInfo(); pe.BeginPage(pp, pis[i].Value, i == pis.Count - 1, null); pe.BeginGenerateGraphics(null); pe.EndGenerateGraphics(null); pe.EndPage(null);
                                         }
@@ -283,7 +283,7 @@ namespace BPlus.LiveMap
                                             try
                                             {
                                                 if (EscPressed()) { failed.Add("Stopped with Esc before " + kv.Key); break; }
-                                                ed.WriteMessage("\n[B+] Plotting " + kv.Key);
+                                                ed.WriteMessage(Ar.T("\n[B+] Plotting ") + kv.Key);
                                                 try { LayoutManager.Current.CurrentLayout = kv.Key; } catch { }
                                                 if (ms) MsPdfWatch.Reset();
                                                 string path = ch.Pdf ? PlotNaming.Unique(ch.Folder, PlotNaming.FileName(ch.Pattern, drawing, kv.Key), ".pdf", File.Exists) : "";
@@ -312,7 +312,7 @@ namespace BPlus.LiveMap
                 foreach (var d in done.ToList()) { if (!ch.Pdf) continue; string p = d.Contains("  (") ? d.Substring(0, d.IndexOf("  (")) : d; try { if (!File.Exists(p) || new FileInfo(p).Length == 0) { done.Remove(d); failed.Add(p + ": the file is missing or empty"); } } catch { } }
                 var sb = new StringBuilder(); sb.AppendLine(done.Count + " done, " + failed.Count + " failed."); foreach (var d in done) sb.AppendLine("  " + d); foreach (var x in failed) sb.AppendLine("  FAILED " + x);
                 ed.WriteMessage("\n[B+] " + sb.ToString().Replace("\r", ""));
-                System.Windows.Forms.MessageBox.Show(sb.ToString(), "B+ CAD Tools - Plot layouts");
+                System.Windows.Forms.MessageBox.Show(sb.ToString(), Ar.T("B+ CAD Tools - Plot layouts"));
             });
         }
     }

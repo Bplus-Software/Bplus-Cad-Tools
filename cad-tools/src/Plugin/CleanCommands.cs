@@ -136,7 +136,7 @@ namespace BPlus.LiveMap
             Guard("BPCLEAN", () =>
             {
                 var doc = Doc; var ed = doc.Editor; var db = doc.Database; var st = new CleanScan();
-                if (string.IsNullOrEmpty(doc.Name) || !File.Exists(doc.Name)) { MessageBox.Show("Save the drawing first, then run Clean drawing.", "B+ CAD Tools"); return; }
+                if (string.IsNullOrEmpty(doc.Name) || !File.Exists(doc.Name)) { MessageBox.Show(Ar.T("Save the drawing first, then run Clean drawing."), Ar.T("B+ CAD Tools")); return; }
                 while (true)
                 {
                     try { AcApp.MainWindow.Focus(); } catch { }
@@ -153,7 +153,7 @@ namespace BPlus.LiveMap
                 }
                 if (Convert.ToInt32(AcApp.GetSystemVariable("DBMOD")) != 0)
                 {
-                    var r = MessageBox.Show("This drawing has unsaved changes. Save it first so the backup and the size comparison are correct?", "B+ CAD Tools - Clean drawing", MessageBoxButtons.YesNoCancel);
+                    var r = MessageBox.Show(Ar.T("This drawing has unsaved changes. Save it first so the backup and the size comparison are correct?"), Ar.T("B+ CAD Tools - Clean drawing"), MessageBoxButtons.YesNoCancel);
                     if (r == DialogResult.Cancel) return; if (r == DialogResult.Yes) db.SaveAs(doc.Name, true, DwgVersion.Current, db.SecurityParameters);
                 }
                 long before = new FileInfo(doc.Name).Length; string backup = null;
@@ -161,7 +161,7 @@ namespace BPlus.LiveMap
                 {
                     string dir = Path.GetDirectoryName(doc.Name), nm = Path.GetFileNameWithoutExtension(doc.Name); backup = Path.Combine(dir, nm + "-before-cleanup.dwg"); int k = 2;
                     while (File.Exists(backup)) backup = Path.Combine(dir, nm + "-before-cleanup" + (k++) + ".dwg");
-                    try { File.Copy(doc.Name, backup); } catch (Exception ex) { MessageBox.Show("Could not save the backup, nothing was cleaned.\r\n" + ex.Message, "B+ CAD Tools"); return; }
+                    try { File.Copy(doc.Name, backup); } catch (Exception ex) { MessageBox.Show(Ar.T("Could not save the backup, nothing was cleaned.\r\n") + ex.Message, Ar.T("B+ CAD Tools")); return; }
                 }
                 int rl = 0, rb = 0, rs = 0, ro = 0, rz = 0, rd = 0;
                 using (doc.LockDocument())
@@ -200,7 +200,7 @@ namespace BPlus.LiveMap
                 }
                 else msg += "\r\nNot saved. UNDO reverses the cleaning.";
                 if (backup != null) msg += "\r\nBackup: " + backup;
-                ed.WriteMessage("\n[B+] " + msg.Replace("\r", "") + "\n"); MessageBox.Show(msg, "B+ CAD Tools - Clean drawing");
+                ed.WriteMessage("\n[B+] " + msg.Replace("\r", "") + "\n"); MessageBox.Show(msg, Ar.T("B+ CAD Tools - Clean drawing"));
             });
         }
     }

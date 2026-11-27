@@ -69,10 +69,10 @@ namespace BPlus.LiveMap
             Guard("BPLENGTHS", () =>
             {
                 var doc = Doc; var ed = doc.Editor;
-                var psr = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = "\nSelect polylines, lines or arcs" }, CrvFilter);
+                var psr = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = Ar.T("\nSelect polylines, lines or arcs") }, CrvFilter);
                 if (psr.Status != PromptStatus.OK) return;
                 var ids = psr.Value.GetObjectIds(); var rows = LenRows(doc, ids);
-                if (rows.Count == 0) { ed.WriteMessage("\n[B+] Nothing measurable was selected.\n"); return; }
+                if (rows.Count == 0) { ed.WriteMessage(Ar.T("\n[B+] Nothing measurable was selected.\n")); return; }
                 int sel = -1;
                 try
                 {
@@ -87,7 +87,7 @@ namespace BPlus.LiveMap
                             doc.Editor.SetImpliedSelection(new[] { (ObjectId)rows[row].Tag });
                             continue;
                         }
-                        if (action == 2) { int n = LabelCurves(doc, rows.Select(r => (ObjectId)r.Tag).ToArray(), true, true); ed.WriteMessage("\n[B+] " + n + " label(s) placed on layer BP-LABEL. One UNDO removes them.\n"); }
+                        if (action == 2) { int n = LabelCurves(doc, rows.Select(r => (ObjectId)r.Tag).ToArray(), true, true); ed.WriteMessage("\n[B+] " + n + Ar.T(" label(s) placed on layer BP-LABEL. One UNDO removes them.\n")); }
                         if (action == 3) InsertTable(doc, rows);
                         break;
                     }
@@ -98,7 +98,7 @@ namespace BPlus.LiveMap
 
         static void InsertTable(Document doc, List<LenRow> rows)
         {
-            var ed = doc.Editor; var pr = ed.GetPoint(new PromptPointOptions("\nTable insertion point (top left): ")); if (pr.Status != PromptStatus.OK) return;
+            var ed = doc.Editor; var pr = ed.GetPoint(new PromptPointOptions(Ar.T("\nTable insertion point (top left): "))); if (pr.Status != PromptStatus.OK) return;
             double th = Config.TextHeight; int n = rows.Count;
             using (doc.LockDocument())
             using (var tr = doc.Database.TransactionManager.StartTransaction())
@@ -123,7 +123,7 @@ namespace BPlus.LiveMap
                 t.GenerateLayout();
                 ms.AppendEntity(t); tr.AddNewlyCreatedDBObject(t, true); tr.Commit();
             }
-            ed.WriteMessage("\n[B+] Table inserted with " + n + " rows. One UNDO removes it.\n");
+            ed.WriteMessage(Ar.T("\n[B+] Table inserted with ") + n + Ar.T(" rows. One UNDO removes it.\n"));
         }
 
         static int LabelCurves(Document doc, ObjectId[] ids, bool len, bool area)
@@ -166,13 +166,13 @@ namespace BPlus.LiveMap
             Guard("BPLABEL", () =>
             {
                 var doc = Doc; var ed = doc.Editor;
-                var psr = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = "\nSelect polylines, lines or arcs to label" }, CrvFilter);
+                var psr = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = Ar.T("\nSelect polylines, lines or arcs to label") }, CrvFilter);
                 if (psr.Status != PromptStatus.OK) return;
-                var kw = new PromptKeywordOptions("\nLabel [Length/Area/Both] <Both>: ", "Length Area Both") { AllowNone = true }; var kr = ed.GetKeywords(kw);
+                var kw = new PromptKeywordOptions(Ar.T("\nLabel [Length/Area/Both] <Both>: "), Ar.T("Length Area Both")) { AllowNone = true }; var kr = ed.GetKeywords(kw);
                 if (kr.Status != PromptStatus.OK && kr.Status != PromptStatus.None) return;
                 string m = kr.Status == PromptStatus.OK ? kr.StringResult : "Both";
                 int n = LabelCurves(doc, psr.Value.GetObjectIds(), m != "Area", m != "Length");
-                ed.WriteMessage("\n[B+] " + n + " label(s) placed on layer BP-LABEL (text height " + N3(Config.TextHeight) + ", change it in Settings). One UNDO removes them.\n");
+                ed.WriteMessage("\n[B+] " + n + Ar.T(" label(s) placed on layer BP-LABEL (text height ") + N3(Config.TextHeight) + Ar.T(", change it in Settings). One UNDO removes them.\n"));
             });
         }
 
@@ -182,9 +182,9 @@ namespace BPlus.LiveMap
             Guard("BPVERTS", () =>
             {
                 var doc = Doc; var ed = doc.Editor;
-                var psr = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = "\nSelect polylines or lines" }, "LWPOLYLINE,POLYLINE,LINE");
+                var psr = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = Ar.T("\nSelect polylines or lines") }, Ar.T("LWPOLYLINE,POLYLINE,LINE"));
                 if (psr.Status != PromptStatus.OK) return;
-                var sn = ed.GetInteger(new PromptIntegerOptions("\nFirst point number <1>: ") { AllowNone = true, DefaultValue = 1, UseDefaultValue = true, LowerLimit = 0 }); if (sn.Status != PromptStatus.OK) return;
+                var sn = ed.GetInteger(new PromptIntegerOptions(Ar.T("\nFirst point number <1>: ")) { AllowNone = true, DefaultValue = 1, UseDefaultValue = true, LowerLimit = 0 }); if (sn.Status != PromptStatus.OK) return;
                 int no = sn.Value; var pts = new List<SurveyPoint>(); var seen = new HashSet<string>();
                 using (var tr = doc.Database.TransactionManager.StartTransaction())
                 {
@@ -197,7 +197,7 @@ namespace BPlus.LiveMap
                     tr.Commit();
                 }
                 int n = SurveyCad.Import(doc, pts, SurveyCad.LoadRules(), true, Config.TextHeight, true);
-                ed.WriteMessage("\n[B+] " + n + " point(s) made from vertices (repeated positions skipped), numbered from " + sn.Value + ". One UNDO removes them.\n");
+                ed.WriteMessage("\n[B+] " + n + Ar.T(" point(s) made from vertices (repeated positions skipped), numbered from ") + sn.Value + Ar.T(". One UNDO removes them.\n"));
             });
         }
 
@@ -207,7 +207,7 @@ namespace BPlus.LiveMap
             Guard("BPCOORD", () =>
             {
                 var doc = Doc; var ed = doc.Editor;
-                var psr = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = "\nSelect points, polylines or lines to label with E, N" }, "POINT,LWPOLYLINE,POLYLINE,LINE");
+                var psr = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = Ar.T("\nSelect points, polylines or lines to label with E, N") }, Ar.T("POINT,LWPOLYLINE,POLYLINE,LINE"));
                 if (psr.Status != PromptStatus.OK) return;
                 double th = Config.TextHeight; int n = 0; var seen = new HashSet<string>();
                 using (doc.LockDocument())
@@ -228,7 +228,7 @@ namespace BPlus.LiveMap
                     }
                     tr.Commit();
                 }
-                ed.WriteMessage("\n[B+] " + n + " coordinate label(s) on layer BP-COORD (text height " + N3(th) + "). One UNDO removes them.\n");
+                ed.WriteMessage("\n[B+] " + n + Ar.T(" coordinate label(s) on layer BP-COORD (text height ") + N3(th) + Ar.T("). One UNDO removes them.\n"));
             });
         }
 
@@ -236,7 +236,7 @@ namespace BPlus.LiveMap
         static CsProvider NeedCs(Document doc)
         {
             var p = Engine.EnsureProvider(doc, true);
-            if (p == null) MessageBox.Show("This drawing has no coordinate system yet. Pick one (Live map > Options > Coordinate system) and run the command again.", "B+ CAD Tools", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            if (p == null) MessageBox.Show(Ar.T("This drawing has no coordinate system yet. Pick one (Live map > Options > Coordinate system) and run the command again."), Ar.T("B+ CAD Tools"), MessageBoxButtons.OK, MessageBoxIcon.Information);
             return p;
         }
 
@@ -250,7 +250,7 @@ namespace BPlus.LiveMap
                 var cs = NeedCs(doc); if (cs == null) return;
                 List<KmlFeature> feats;
                 try { using (var fs = File.OpenRead(path)) feats = Kml.Read(fs, path.EndsWith(".kmz", StringComparison.OrdinalIgnoreCase)); }
-                catch (System.Exception e) { MessageBox.Show("Could not read the file: " + e.Message, "B+ CAD Tools", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+                catch (System.Exception e) { MessageBox.Show(Ar.T("Could not read the file: ") + e.Message, Ar.T("B+ CAD Tools"), MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
                 var pts = new List<SurveyPoint>(); int lines = 0, no = 1;
                 foreach (var f in feats.Where(x => x.Kind == "Point")) { double x, y; cs.FromLonLat(f.Coords[0][0], f.Coords[0][1], out x, out y); pts.Add(new SurveyPoint { No = (no++).ToString(), E = x, N = y, Z = f.Coords[0][2], HasZ = true, Desc = f.Name }); }
                 if (pts.Count > 0) SurveyCad.Import(doc, pts, SurveyCad.LoadRules(), true, Config.TextHeight, true);
@@ -268,7 +268,7 @@ namespace BPlus.LiveMap
                     }
                     tr.Commit();
                 }
-                ed.WriteMessage("\n[B+] KML/KMZ: " + pts.Count + " point(s), " + lines + " line/polygon(s) imported using " + cs.Description + ". Use ZOOM EXTENTS. Check them against known points.\n");
+                ed.WriteMessage(Ar.T("\n[B+] KML/KMZ: ") + pts.Count + Ar.T(" point(s), ") + lines + Ar.T(" line/polygon(s) imported using ") + cs.Description + Ar.T(". Use ZOOM EXTENTS. Check them against known points.\n"));
             });
         }
 
@@ -278,7 +278,7 @@ namespace BPlus.LiveMap
             Guard("BPKMLEXP", () =>
             {
                 var doc = Doc; var ed = doc.Editor;
-                var psr = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = "\nSelect points, polylines and lines to export" }, "POINT,AECC_COGO_POINT,LWPOLYLINE,POLYLINE,LINE");
+                var psr = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = Ar.T("\nSelect points, polylines and lines to export") }, Ar.T("POINT,AECC_COGO_POINT,LWPOLYLINE,POLYLINE,LINE"));
                 if (psr.Status != PromptStatus.OK) return;
                 var cs = NeedCs(doc); if (cs == null) return;
                 string path; using (var d = new SaveFileDialog { Filter = "KMZ|*.kmz|KML|*.kml", FileName = "export.kmz", Title = "Export KML or KMZ" }) { if (d.ShowDialog() != DialogResult.OK) return; path = d.FileName; }
@@ -298,7 +298,7 @@ namespace BPlus.LiveMap
                 }
                 string kml = Kml.Write(feats, Path.GetFileNameWithoutExtension(path));
                 if (path.EndsWith(".kmz", StringComparison.OrdinalIgnoreCase)) using (var fs = File.Create(path)) Kml.WriteKmz(fs, kml); else File.WriteAllText(path, kml, new UTF8Encoding(false));
-                ed.WriteMessage("\n[B+] Exported " + feats.Count + " feature(s) to " + path + " using " + cs.Description + ". Arc segments are written as straight lines between vertices.\n");
+                ed.WriteMessage(Ar.T("\n[B+] Exported ") + feats.Count + Ar.T(" feature(s) to ") + path + Ar.T(" using ") + cs.Description + Ar.T(". Arc segments are written as straight lines between vertices.\n"));
             });
         }
 
@@ -307,18 +307,18 @@ namespace BPlus.LiveMap
             var doc = Doc; string path;
             using (var d = new OpenFileDialog { Filter = filter, Title = title }) { if (d.ShowDialog() != DialogResult.OK) return; path = d.FileName; }
             ParseResult r;
-            try { r = parse(File.ReadAllLines(path, Encoding.UTF8)); } catch (System.Exception e) { MessageBox.Show("Could not read the file: " + e.Message, "B+ CAD Tools", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
-            if (r.Points.Count == 0) { MessageBox.Show("No coordinate records were found in this file." + (r.Problems.Count > 0 ? "\n\n" + string.Join("\n", r.Problems.Take(5)) : ""), "B+ CAD Tools", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+            try { r = parse(File.ReadAllLines(path, Encoding.UTF8)); } catch (System.Exception e) { MessageBox.Show(Ar.T("Could not read the file: ") + e.Message, Ar.T("B+ CAD Tools"), MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+            if (r.Points.Count == 0) { MessageBox.Show(Ar.T("No coordinate records were found in this file.") + (r.Problems.Count > 0 ? "\n\n" + string.Join("\n", r.Problems.Take(5)) : ""), Ar.T("B+ CAD Tools"), MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
             int n = SurveyCad.Import(doc, r.Points, SurveyCad.LoadRules(), true, Config.TextHeight, true);
-            doc.Editor.WriteMessage("\n[B+] " + label + ": imported " + n + " point(s)" + (r.Problems.Count > 0 ? ", skipped " + r.Problems.Count + " line(s)" : "") + ". This reader is not verified against a real instrument file: compare a few points. Use ZOOM EXTENTS.\n");
+            doc.Editor.WriteMessage("\n[B+] " + label + Ar.T(": imported ") + n + Ar.T(" point(s)") + (r.Problems.Count > 0 ? Ar.T(", skipped ") + r.Problems.Count + Ar.T(" line(s)") : "") + Ar.T(". This reader is not verified against a real instrument file: compare a few points. Use ZOOM EXTENTS.\n"));
         }
         static void ExportText(string title, string filter, string name, Func<List<SurveyPoint>, string> fmt, string label)
         {
             var doc = Doc; var pts = SurveyCad.Collect(doc).Select(c => c.P).ToList();
-            if (pts.Count == 0) { doc.Editor.WriteMessage("\n[B+] No points found in model space.\n"); return; }
+            if (pts.Count == 0) { doc.Editor.WriteMessage(Ar.T("\n[B+] No points found in model space.\n")); return; }
             string path; using (var d = new SaveFileDialog { Filter = filter, FileName = name, Title = title }) { if (d.ShowDialog() != DialogResult.OK) return; path = d.FileName; }
             File.WriteAllText(path, fmt(pts), new UTF8Encoding(false));
-            doc.Editor.WriteMessage("\n[B+] " + label + ": exported " + pts.Count + " point(s) to " + path + ". This writer is not verified against a real instrument: test with one small file first.\n");
+            doc.Editor.WriteMessage("\n[B+] " + label + Ar.T(": exported ") + pts.Count + Ar.T(" point(s) to ") + path + Ar.T(". This writer is not verified against a real instrument: test with one small file first.\n"));
         }
         [CommandMethod("BPSDRIMP")] public static void SdrImp() { Guard("BPSDRIMP", () => ImportText("Import SDR", "SDR33 (*.sdr)|*.sdr|All files|*.*", Sdr.Parse, "SDR")); }
         [CommandMethod("BPSDREXP")] public static void SdrExp() { Guard("BPSDREXP", () => ExportText("Export SDR", "SDR33 (*.sdr)|*.sdr", "points.sdr", Sdr.Format, "SDR")); }
@@ -355,10 +355,10 @@ namespace BPlus.LiveMap
             Guard("BPHATCHMERGE", () =>
             {
                 var doc = Doc; var ed = doc.Editor;
-                var psr = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = "\nSelect two or more hatches to merge" }, "HATCH");
+                var psr = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = Ar.T("\nSelect two or more hatches to merge") }, Ar.T("HATCH"));
                 if (psr.Status != PromptStatus.OK) return;
-                var ids = psr.Value.GetObjectIds(); if (ids.Length < 2) { ed.WriteMessage("\n[B+] Select at least two hatches.\n"); return; }
-                var r = MessageBox.Show("Merge " + ids.Length + " hatches into one hatch object?\n\nIt takes the pattern, scale, colour and layer of the first selected hatch. Boundaries that overlap each other may leave holes.\n\nYes = merge and delete the originals\nNo = merge and keep the originals\nCancel = do nothing", "B+ CAD Tools - Merge hatches", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+                var ids = psr.Value.GetObjectIds(); if (ids.Length < 2) { ed.WriteMessage(Ar.T("\n[B+] Select at least two hatches.\n")); return; }
+                var r = MessageBox.Show(Ar.T("Merge ") + ids.Length + Ar.T(" hatches into one hatch object?\n\nIt takes the pattern, scale, colour and layer of the first selected hatch. Boundaries that overlap each other may leave holes.\n\nYes = merge and delete the originals\nNo = merge and keep the originals\nCancel = do nothing"), Ar.T("B+ CAD Tools - Merge hatches"), MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
                 if (r == DialogResult.Cancel) return; bool keep = r == DialogResult.No; int used = 0, skipped = 0;
                 using (doc.LockDocument())
                 using (var tr = doc.Database.TransactionManager.StartTransaction())
@@ -376,7 +376,7 @@ namespace BPlus.LiveMap
                     if (!keep) foreach (var id in ids) { var h = (Hatch)tr.GetObject(id, OpenMode.ForWrite); if (h.Normal.IsEqualTo(first.Normal) && Math.Abs(h.Elevation - first.Elevation) <= 1e-9) h.Erase(); }
                     tr.Commit();
                 }
-                ed.WriteMessage("\n[B+] Merged " + used + " hatch(es) into one" + (skipped > 0 ? " (" + skipped + " skipped: different plane)" : "") + (keep ? ", originals kept" : ", originals deleted") + ". The new hatch is not associative with its boundaries. One UNDO reverses it.\n");
+                ed.WriteMessage(Ar.T("\n[B+] Merged ") + used + Ar.T(" hatch(es) into one") + (skipped > 0 ? " (" + skipped + Ar.T(" skipped: different plane)") : "") + (keep ? Ar.T(", originals kept") : Ar.T(", originals deleted")) + Ar.T(". The new hatch is not associative with its boundaries. One UNDO reverses it.\n"));
             });
         }
 
@@ -386,10 +386,10 @@ namespace BPlus.LiveMap
             Guard("BPHATCHSPLIT", () =>
             {
                 var doc = Doc; var ed = doc.Editor;
-                var psr = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = "\nSelect hatches to split" }, "HATCH");
+                var psr = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = Ar.T("\nSelect hatches to split") }, Ar.T("HATCH"));
                 if (psr.Status != PromptStatus.OK) return;
                 var ids = psr.Value.GetObjectIds();
-                var r = MessageBox.Show("Split each selected hatch into one hatch per separate area?\n\nIslands (holes) stay with the area that contains them.\n\nYes = split and delete the originals\nNo = split and keep the originals\nCancel = do nothing", "B+ CAD Tools - Split hatches", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+                var r = MessageBox.Show(Ar.T("Split each selected hatch into one hatch per separate area?\n\nIslands (holes) stay with the area that contains them.\n\nYes = split and delete the originals\nNo = split and keep the originals\nCancel = do nothing"), Ar.T("B+ CAD Tools - Split hatches"), MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
                 if (r == DialogResult.Cancel) return; bool keep = r == DialogResult.No; int made = 0, split = 0;
                 using (doc.LockDocument())
                 using (var tr = doc.Database.TransactionManager.StartTransaction())
@@ -411,7 +411,7 @@ namespace BPlus.LiveMap
                     }
                     tr.Commit();
                 }
-                ed.WriteMessage(split == 0 ? "\n[B+] Nothing to split: each selected hatch is a single area.\n" : "\n[B+] Split " + split + " hatch(es) into " + made + " (" + (keep ? "originals kept" : "originals deleted") + "). New hatches are not associative. One UNDO reverses it.\n");
+                ed.WriteMessage(split == 0 ? Ar.T("\n[B+] Nothing to split: each selected hatch is a single area.\n") : Ar.T("\n[B+] Split ") + split + Ar.T(" hatch(es) into ") + made + " (" + (keep ? Ar.T("originals kept") : Ar.T("originals deleted")) + Ar.T("). New hatches are not associative. One UNDO reverses it.\n"));
             });
         }
 
@@ -426,7 +426,7 @@ namespace BPlus.LiveMap
                 {
                     Config.Kind = nk == 1 ? MapKind.Roadmap : nk == 2 ? MapKind.Hybrid : MapKind.Satellite; Config.OpacityPercent = no;
                     Engine.RefreshNow();
-                    Doc.Editor.WriteMessage("\n[B+] Map type and opacity saved" + (Engine.On ? "." : ". The map is off: click Live map to show it.") + "\n");
+                    Doc.Editor.WriteMessage(Ar.T("\n[B+] Map type and opacity saved") + (Engine.On ? "." : Ar.T(". The map is off: click Live map to show it.")) + "\n");
                 }
                 if (follow.Length > 0) Doc.SendStringToExecute(follow, true, false, false);
             });
@@ -438,12 +438,12 @@ namespace BPlus.LiveMap
             Guard("BPLEADER", () =>
             {
                 var doc = Doc; var ed = doc.Editor;
-                var psr = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = "\nSelect shapes to label with leaders" }, CrvFilter + ",POINT");
+                var psr = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = Ar.T("\nSelect shapes to label with leaders") }, CrvFilter + Ar.T(",POINT"));
                 if (psr.Status != PromptStatus.OK) return;
                 var allIds = psr.Value.GetObjectIds();
                 var ptIds = allIds.Where(i => i.ObjectClass.DxfName == "POINT").ToArray(); var ids = allIds.Where(i => i.ObjectClass.DxfName != "POINT").ToArray();
                 var rows = LenRows(doc, ids);
-                if (rows.Count == 0 && ptIds.Length == 0) { ed.WriteMessage("\n[B+] Nothing measurable was selected.\n"); return; }
+                if (rows.Count == 0 && ptIds.Length == 0) { ed.WriteMessage(Ar.T("\n[B+] Nothing measurable was selected.\n")); return; }
                 var ch = ToolsUi.Leader(rows.Count, rows.Count(r => r.Closed), ptIds.Length); if (ch == null) return;
                 int made = 0, skipped = 0; double th = ch.TextH; string fmt = "F" + ch.Decimals; var inv = CultureInfo.InvariantCulture;
                 using (doc.LockDocument())
@@ -492,7 +492,7 @@ namespace BPlus.LiveMap
                     }
                     tr.Commit();
                 }
-                ed.WriteMessage("\n[B+] " + made + " leader(s) on layer BP-LEADER" + (skipped > 0 ? ", " + skipped + " shape(s) skipped (open shape for an area label, or not measurable)" : "") + ". One UNDO removes them.\n");
+                ed.WriteMessage("\n[B+] " + made + Ar.T(" leader(s) on layer BP-LEADER") + (skipped > 0 ? ", " + skipped + Ar.T(" shape(s) skipped (open shape for an area label, or not measurable)") : "") + Ar.T(". One UNDO removes them.\n"));
             });
         }
     }

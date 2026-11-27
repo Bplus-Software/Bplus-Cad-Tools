@@ -103,6 +103,7 @@ namespace BPlus.LiveMap
         }
         static void AddStackPanel(RibbonTab tab, string title, int rows, params string[][] btns)
         {
+            title = Ar.T(title);
             _layout.RemoveAll(k => k.Key == title + "|" + rows); _layout.Add(new KeyValuePair<string, string[][]>(title + "|" + rows, btns));
             var src = new RibbonPanelSource { Title = title }; AddStack(src, rows, btns); tab.Panels.Add(new RibbonPanel { Source = src });
         }
@@ -116,7 +117,7 @@ namespace BPlus.LiveMap
             tab.Panels.Add(new RibbonPanel { Source = src });
         }
 
-        static string[] L(string text, string cmd, string icon, string tip) { return new[] { text, cmd, icon, tip }; }
+        static string[] L(string text, string cmd, string icon, string tip) { return new[] { Ar.T(text), cmd, icon, Ar.T(tip) }; }
         static void AddPanel(RibbonTab tab, string title, params string[][] btns)
         {
             var src = new RibbonPanelSource { Title = title };

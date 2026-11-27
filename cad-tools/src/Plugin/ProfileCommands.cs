@@ -80,9 +80,9 @@ namespace BPlus.LiveMap
             Guard("BPPROFILE", () =>
             {
                 var doc = Doc; var ed = doc.Editor; var db = doc.Database;
-                var eo = new PromptEntityOptions("\nSelect the line to cut the profile along (polyline, line or arc): "); eo.SetRejectMessage("\nOnly a polyline, line or arc."); eo.AddAllowedClass(typeof(Curve), false);
+                var eo = new PromptEntityOptions(Ar.T("\nSelect the line to cut the profile along (polyline, line or arc): ")); eo.SetRejectMessage(Ar.T("\nOnly a polyline, line or arc.")); eo.AddAllowedClass(typeof(Curve), false);
                 var er = ed.GetEntity(eo); if (er.Status != PromptStatus.OK) return;
-                var po = new PromptSelectionOptions { MessageForAdding = "\nSelect the points (AutoCAD points or Civil 3D COGO points). Press Enter to use the line's own vertex levels: " };
+                var po = new PromptSelectionOptions { MessageForAdding = Ar.T("\nSelect the points (AutoCAD points or Civil 3D COGO points). Press Enter to use the line's own vertex levels: ") };
                 var pre = Sel.Peek(ed); var psr = pre.Length > 0 ? Sel.Get(ed, po, "POINT,AECC_COGO_POINT", pre) : null;
                 if (psr == null || psr.Status != PromptStatus.OK) { try { psr = Sel.Get(ed, po, "POINT,AECC_COGO_POINT"); } catch { psr = null; } }
                 bool any = psr != null && psr.Status == PromptStatus.OK && psr.Value.Count > 0;
@@ -112,7 +112,7 @@ namespace BPlus.LiveMap
                                 double sta; try { sta = cv.GetDistAtPoint(q); } catch { skipped++; continue; }
                                 raw.Add(new ProfPt { Id = cp.P.No ?? "", Sta = sta, Z = cp.P.Z, Off = off });
                             }
-                            if (skipped > 0 || noz > 0) ed.WriteMessage("\n[B+] " + skipped + " point(s) are farther than " + o.Offset + " m from the line or off its ends and were left out" + (noz > 0 ? "; " + noz + " have no level" : "") + ".\n");
+                            if (skipped > 0 || noz > 0) ed.WriteMessage("\n[B+] " + skipped + Ar.T(" point(s) are farther than ") + o.Offset + Ar.T(" m from the line or off its ends and were left out") + (noz > 0 ? "; " + noz + Ar.T(" have no level") : "") + ".\n");
                         }
                         else
                         {
@@ -126,13 +126,13 @@ namespace BPlus.LiveMap
                         tr.Commit();
                     }
                 }
-                if (raw.Count == 0) { ed.WriteMessage("\n[B+] No usable points: nothing within the offset of the line, or the line has no levels (all Z are 0 on a flat polyline)." + "\n"); return; }
-                if (raw.Count == 1) { ed.WriteMessage("\n[B+] Only one point found; a profile needs at least two.\n"); return; }
-                var ip = ed.GetPoint("\nPick the insertion point of the profile (its datum line starts here): "); if (ip.Status != PromptStatus.OK) return;
+                if (raw.Count == 0) { ed.WriteMessage(Ar.T("\n[B+] No usable points: nothing within the offset of the line, or the line has no levels (all Z are 0 on a flat polyline).") + "\n"); return; }
+                if (raw.Count == 1) { ed.WriteMessage(Ar.T("\n[B+] Only one point found; a profile needs at least two.\n")); return; }
+                var ip = ed.GetPoint(Ar.T("\nPick the insertion point of the profile (its datum line starts here): ")); if (ip.Status != PromptStatus.OK) return;
                 var model0 = raw; var model = ProfileMath.Build(raw, o.Ve, o.Interval, o.TextH, o.Datum, o.Label, o.Table, new ProfStyle { Height = o.Height, Grid = o.Grid, Drops = o.Drops, MarkExtremes = o.Mark, AvgLine = o.Avg });
                 int made = DrawProfile(doc, model, ip.Value, o.TextH, o.GLine, o.GCol);
-                if (model.Summary.Count > 4) ed.WriteMessage("\n[B+] Average level " + model.Summary[1][2] + " m (of the points). Highest " + model.Summary[2][2] + " m at " + model.Summary[2][1] + ". Lowest " + model.Summary[3][2] + " m at " + model.Summary[3][1] + " (" + model.Summary[3][3] + ").\n");
-                ed.WriteMessage("\n[B+] Profile drawn on layer B+_PROFILE: " + raw.Count + " points, line length " + length.ToString("F2", CultureInfo.InvariantCulture) + " m, datum " + model.Datum.ToString("F2", CultureInfo.InvariantCulture) + " m, exaggeration x" + o.Ve.ToString("0.##", CultureInfo.InvariantCulture) + ", " + made + " objects. It is a drawing: it does not update if the points move.\n");
+                if (model.Summary.Count > 4) ed.WriteMessage(Ar.T("\n[B+] Average level ") + model.Summary[1][2] + Ar.T(" m (of the points). Highest ") + model.Summary[2][2] + " m at " + model.Summary[2][1] + Ar.T(". Lowest ") + model.Summary[3][2] + " m at " + model.Summary[3][1] + " (" + model.Summary[3][3] + ").\n");
+                ed.WriteMessage(Ar.T("\n[B+] Profile drawn on layer B+_PROFILE: ") + raw.Count + Ar.T(" points, line length ") + length.ToString("F2", CultureInfo.InvariantCulture) + Ar.T(" m, datum ") + model.Datum.ToString("F2", CultureInfo.InvariantCulture) + Ar.T(" m, exaggeration x") + o.Ve.ToString("0.##", CultureInfo.InvariantCulture) + ", " + made + Ar.T(" objects. It is a drawing: it does not update if the points move.\n"));
             });
         }
 

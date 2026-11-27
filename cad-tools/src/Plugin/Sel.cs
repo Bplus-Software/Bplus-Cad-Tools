@@ -31,7 +31,7 @@ namespace BPlus.LiveMap
             if (have.Length > 0)
             {
                 try { ed.SetImpliedSelection(new ObjectId[0]); } catch { }
-                ed.WriteMessage("\n[B+] Using " + have.Length + " object(s) already selected.\n");
+                ed.WriteMessage(Ar.T("\n[B+] Using ") + have.Length + Ar.T(" object(s) already selected.\n"));
                 return new SelResult { Status = PromptStatus.OK, Value = new SelValue { Ids = have } };
             }
             PromptSelectionResult r = names == null ? ed.GetSelection(opt)

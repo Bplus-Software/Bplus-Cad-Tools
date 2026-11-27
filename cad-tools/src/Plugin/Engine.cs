@@ -138,7 +138,7 @@ namespace BPlus.LiveMap
         {
             if (!force && (DateTime.Now - _lastMsg).TotalSeconds < 20) return;
             _lastMsg = DateTime.Now;
-            try { var d = AcApp.DocumentManager.MdiActiveDocument; if (d != null) d.Editor.WriteMessage("\n[BPlus map] " + msg + "\n"); } catch { }
+            try { var d = AcApp.DocumentManager.MdiActiveDocument; if (d != null) d.Editor.WriteMessage(Ar.T("\n[BPlus map] ") + msg + "\n"); } catch { }
             Log.Write(msg);
         }
 
@@ -208,7 +208,7 @@ namespace BPlus.LiveMap
         {
             Plan plan;
             try { plan = MakePlan(prov, vi); } catch (Exception e) { Say("Could not work out the map area: " + e.Message, true); return; }
-            if (Config.UseOwnKey && string.IsNullOrEmpty(KeyStore.Get())) { Say("No Google API key is saved yet. Run BPGMAPSET and paste your key.", true); try { System.Windows.Forms.MessageBox.Show("No Google key is saved, so the live map was turned off. Open Live map > Options > Settings and Google key and paste your key.", "B+ CAD Tools - Live Map"); } catch { } On = false; Config.Enabled = false; RemoveTransient(); return; }
+            if (Config.UseOwnKey && string.IsNullOrEmpty(KeyStore.Get())) { Say(Ar.T("No Google API key is saved yet. Run BPGMAPSET and paste your key."), true); try { System.Windows.Forms.MessageBox.Show(Ar.T("No Google key is saved, so the live map was turned off. Open Live map > Options > Settings and Google key and paste your key."), Ar.T("B+ CAD Tools - Live Map")); } catch { } On = false; Config.Enabled = false; RemoveTransient(); return; }
             if (_current != null && _current.Cts != null) _current.Cts.Cancel();
             plan.Cts = new CancellationTokenSource(); _current = plan; _busy = true;
             if (!_warned && Usage.ThisMonth >= Config.WarnAt) { _warned = true; Say("Google tile requests this month: " + Usage.ThisMonth + " (your warning level is " + Config.WarnAt + ").", true); }
@@ -301,7 +301,7 @@ namespace BPlus.LiveMap
                 var tm = TransientManager.CurrentTransientManager;
                 tm.AddTransient(dr, TransientDrawingMode.Main, 128, new IntegerCollection());
                 doc.Editor.UpdateScreen();
-                var o = new PromptStringOptions("\nTest card shown. Is the word TOP at the top, and do your drawing lines show over the blue card? Press Enter to remove it") { AllowSpaces = true };
+                var o = new PromptStringOptions(Ar.T("\nTest card shown. Is the word TOP at the top, and do your drawing lines show over the blue card? Press Enter to remove it")) { AllowSpaces = true };
                 doc.Editor.GetString(o);
                 tm.EraseTransient(dr, new IntegerCollection());
                 foreach (var t in dr.Tiles) t.Dispose();

@@ -255,12 +255,12 @@ namespace BPlus.LiveMap
                     set.Enabled = lib != null; mv.Enabled = lib != null && src != null && movable > 0;
                 };
                 var only = Theme.Btn("Only in B+ tools", 206, 430 + dy, 150); var save = Theme.Btn("Save definition file", 366, 430 + dy, 144);
-                save.Click += (s, e) => { try { string pth = WriteDefinition(chosen); MessageBox.Show(f, "Saved:\r\n" + pth + "\r\n\r\nIt lists the exact parameters (datum, ellipsoid, projection) to add the system in Autodesk's library manager.", "B+ CAD Tools"); try { System.Diagnostics.Process.Start("explorer.exe", "/select,\"" + pth + "\""); } catch { } } catch (System.Exception ex) { MessageBox.Show(f, "Not saved: " + ex.Message, "B+ CAD Tools"); } }; var cancel = Theme.Btn("Cancel", 520, 430 + dy, 100);
+                save.Click += (s, e) => { try { string pth = WriteDefinition(chosen); MessageBox.Show(f, Ar.T("Saved:\r\n") + pth + Ar.T("\r\n\r\nIt lists the exact parameters (datum, ellipsoid, projection) to add the system in Autodesk's library manager."), Ar.T("B+ CAD Tools")); try { System.Diagnostics.Process.Start(Ar.T("explorer.exe"), Ar.T("/select,\"") + pth + "\""); } catch { } } catch (System.Exception ex) { MessageBox.Show(f, Ar.T("Not saved: ") + ex.Message, Ar.T("B+ CAD Tools")); } }; var cancel = Theme.Btn(Ar.T("Cancel"), 520, 430 + dy, 100);
                 set.Click += (s, e) =>
                 {
-                    if (mv.Checked && MessageBox.Show(f, "Move " + movable + " object(s) from EPSG:" + src.Epsg + " to EPSG:" + chosen.Epsg + "?\r\n\r\nHave you saved a backup copy?", "B+ CAD Tools", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
+                    if (mv.Checked && MessageBox.Show(f, Ar.T("Move ") + movable + Ar.T(" object(s) from EPSG:") + src.Epsg + Ar.T(" to EPSG:") + chosen.Epsg + Ar.T("?\r\n\r\nHave you saved a backup copy?"), Ar.T("B+ CAD Tools"), MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
                     if (mv.Checked) { try { Commands.MoveAllModel(doc, src, chosen); } catch (System.Exception ex) { Log.Write("MoveAllModel: " + ex); MessageBox.Show(f, "Objects not moved: " + ex.Message, "B+ CAD Tools"); return; } }
-                    var err = Apply(doc, lib); if (err == null) { res = mv.Checked ? 3 : 2; f.DialogResult = DialogResult.OK; } else MessageBox.Show(f, (mv.Checked ? "The objects were moved but the drawing setting was NOT changed: " : "Not changed: ") + err, "B+ CAD Tools");
+                    var err = Apply(doc, lib); if (err == null) { res = mv.Checked ? 3 : 2; f.DialogResult = DialogResult.OK; } else MessageBox.Show(f, (mv.Checked ? Ar.T("The objects were moved but the drawing setting was NOT changed: ") : Ar.T("Not changed: ")) + err, Ar.T("B+ CAD Tools"));
                 };
                 only.Click += (s, e) => { res = 1; f.DialogResult = DialogResult.OK; }; cancel.Click += (s, e) => f.DialogResult = DialogResult.Cancel; f.CancelButton = cancel;
                 f.Controls.AddRange(new Control[] { set, only, save, cancel }); AcApp.ShowModalDialog(f);

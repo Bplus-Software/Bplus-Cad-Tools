@@ -58,7 +58,7 @@ namespace BPlus.LiveMap
                 custom.TextChanged += (s, e) => reload(); del.SelectedIndexChanged += (s, e) => reload(); path.Leave += (s, e) => reload();
                 ok.Click += (s, e) =>
                 {
-                    double h; if (!Theme.TryNum(th.Text, out h) || h <= 0 || h > 50) { MessageBox.Show(f, "Text height must be a number above zero and not more than 50 (drawing units, normally metres). Example: 0.5", "BPlus"); return; }
+                    double h; if (!Theme.TryNum(th.Text, out h) || h <= 0 || h > 50) { MessageBox.Show(f, Ar.T("Text height must be a number above zero and not more than 50 (drawing units, normally metres). Example: 0.5"), Ar.T("BPlus")); return; }
                     c.TextH = h; c.Labels = lab.Checked; c.Path = path.Text.Trim(); c.Delim = DelimCodes[del.SelectedIndex]; f.DialogResult = DialogResult.OK;
                 };
                 cancel.Click += (s, e) => f.DialogResult = DialogResult.Cancel;
@@ -87,10 +87,10 @@ namespace BPlus.LiveMap
                 br.Click += (s, e) => { using (var d = new SaveFileDialog { Filter = "Text|*.txt|CSV|*.csv", FileName = "points" + (del.SelectedIndex == 0 ? ".csv" : ".txt") }) if (d.ShowDialog(f) == DialogResult.OK) path.Text = d.FileName; };
                 ok.Click += (s, e) =>
                 {
-                    if (path.Text.Trim().Length == 0) { MessageBox.Show(f, "Choose where to save the file.", "BPlus"); return; }
+                    if (path.Text.Trim().Length == 0) { MessageBox.Show(f, Ar.T("Choose where to save the file."), Ar.T("BPlus")); return; }
                     c.Path = path.Text.Trim(); c.Order = OrderCodes[ord.SelectedIndex]; c.Delim = new[] { ',', '\t', ' ', ';' }[del.SelectedIndex]; c.Decimals = (int)dec.Value; c.Header = hdr.Checked;
                     for (int i = 0; i < list.Items.Count; i++) if (list.GetItemChecked(i)) c.Cats.Add(cats[i].Key);
-                    if (c.Cats.Count == 0) { MessageBox.Show(f, "Tick at least one category.", "BPlus"); return; }
+                    if (c.Cats.Count == 0) { MessageBox.Show(f, Ar.T("Tick at least one category."), Ar.T("BPlus")); return; }
                     f.DialogResult = DialogResult.OK;
                 };
                 cancel.Click += (s, e) => f.DialogResult = DialogResult.Cancel;
@@ -112,8 +112,8 @@ namespace BPlus.LiveMap
                 ok.Click += (s, e) =>
                 {
                     var pr = new List<string>(); var r = CodeRules.Parse(t.Text, pr);
-                    if (pr.Count > 0) { MessageBox.Show(f, string.Join("\n", pr.Take(6)), "BPlus - fix these lines"); return; }
-                    if (r.Cats.Count == 0) { MessageBox.Show(f, "Add at least one category.", "BPlus"); return; }
+                    if (pr.Count > 0) { MessageBox.Show(f, string.Join("\n", pr.Take(6)), Ar.T("BPlus - fix these lines")); return; }
+                    if (r.Cats.Count == 0) { MessageBox.Show(f, Ar.T("Add at least one category."), Ar.T("BPlus")); return; }
                     result = t.Text; f.DialogResult = DialogResult.OK;
                 };
                 cancel.Click += (s, e) => f.DialogResult = DialogResult.Cancel;

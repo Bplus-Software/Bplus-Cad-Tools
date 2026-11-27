@@ -91,7 +91,7 @@ namespace BPlus.LiveMap
                 f.Controls.Add(Theme.Lbl("Next you select the points. You see a summary before anything changes, and one UNDO reverses it.", 20, 252, 520, true));
                 f.Controls.Add(Theme.Lbl("Civil 3D points need Civil 3D to be running.", 20, 276, 520, true));
                 var ok = Theme.Btn("Select points", 300, 320, 130, true); var cancel = Theme.Btn("Cancel", 440, 320, 90); ConvChoice res = null;
-                ok.Click += (s, e) => { int n; if (give.Checked && (!int.TryParse(st.Text.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out n) || n < 1)) { MessageBox.Show(f, "The start number must be a whole number, 1 or more.", "B+ CAD Tools"); return; } res = new ConvChoice { ToCogo = a.Checked, Keep = keep.Checked, GiveFree = give.Checked, Start = give.Checked ? int.Parse(st.Text.Trim(), CultureInfo.InvariantCulture) : 1001 }; f.DialogResult = DialogResult.OK; };
+                ok.Click += (s, e) => { int n; if (give.Checked && (!int.TryParse(st.Text.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out n) || n < 1)) { MessageBox.Show(f, Ar.T("The start number must be a whole number, 1 or more."), Ar.T("B+ CAD Tools")); return; } res = new ConvChoice { ToCogo = a.Checked, Keep = keep.Checked, GiveFree = give.Checked, Start = give.Checked ? int.Parse(st.Text.Trim(), CultureInfo.InvariantCulture) : 1001 }; f.DialogResult = DialogResult.OK; };
                 cancel.Click += (s, e) => f.DialogResult = DialogResult.Cancel; f.Controls.AddRange(new Control[] { ok, cancel }); f.AcceptButton = ok; f.CancelButton = cancel;
                 return AcApp.ShowModalDialog(f) == DialogResult.OK ? res : null;
             }
@@ -105,14 +105,14 @@ namespace BPlus.LiveMap
                 var doc = Doc; var ed = doc.Editor; var db = doc.Database;
                 if (!CivilBridge.Present)
                 {
-                    MessageBox.Show("Convert points needs Civil 3D.\r\n\r\nThis is plain AutoCAD, so nothing was changed.\r\nOpen the drawing in Civil 3D and run this again.", "B+ CAD Tools - Convert points");
-                    ed.WriteMessage("\n[B+] Convert points needs Civil 3D. Nothing changed.\n"); return;
+                    MessageBox.Show(Ar.T("Convert points needs Civil 3D.\r\n\r\nThis is plain AutoCAD, so nothing was changed.\r\nOpen the drawing in Civil 3D and run this again."), Ar.T("B+ CAD Tools - Convert points"));
+                    ed.WriteMessage(Ar.T("\n[B+] Convert points needs Civil 3D. Nothing changed.\n")); return;
                 }
                 var ch = ConvAsk(); if (ch == null) return;
-                var po = new PromptSelectionOptions { MessageForAdding = ch.ToCogo ? "\nSelect the AutoCAD points to convert: " : "\nSelect the COGO points to convert: " };
+                var po = new PromptSelectionOptions { MessageForAdding = ch.ToCogo ? Ar.T("\nSelect the AutoCAD points to convert: ") : Ar.T("\nSelect the COGO points to convert: ") };
                 var sr = Sel.Get(ed, po, ch.ToCogo ? "POINT" : "AECC_COGO_POINT"); if (sr.Status != PromptStatus.OK) return;
                 var ids = new HashSet<ObjectId>(sr.Value.GetObjectIds()); var pts = SurveyCad.Collect(doc, ids).Where(p => p.IsCogo != ch.ToCogo).ToList();
-                if (pts.Count == 0) { ed.WriteMessage("\n[B+] No " + (ch.ToCogo ? "AutoCAD" : "COGO") + " points in the selection.\n"); return; }
+                if (pts.Count == 0) { ed.WriteMessage("\n[B+] No " + (ch.ToCogo ? Ar.T("AutoCAD") : Ar.T("COGO")) + Ar.T(" points in the selection.\n")); return; }
                 int done = 0; var skipped = new List<string>(); var errors = new List<string>();
                 using (doc.LockDocument())
                 {
@@ -129,8 +129,8 @@ namespace BPlus.LiveMap
                         if (used2 > 0) sb.AppendLine("Skipped, number already used: " + used2); if (nonum > 0) sb.AppendLine("Skipped, no number: " + nonum);
                         sb.AppendLine(ch.Keep ? "Originals stay in the drawing." : "Originals are deleted after conversion (UNDO brings them back).");
                         foreach (var i in plan.Where(i => !i.Go).Take(8)) sb.AppendLine("   skipped: " + (string.IsNullOrEmpty(i.Src.No) ? "(no number)" : i.Src.No) + "  E " + i.Src.E.ToString("0.###", CultureInfo.InvariantCulture) + "  N " + i.Src.N.ToString("0.###", CultureInfo.InvariantCulture));
-                        if (ok == 0) { MessageBox.Show(sb.ToString() + "\r\nNothing to convert.", "B+ CAD Tools - Convert points"); return; }
-                        if (MessageBox.Show(sb.ToString().Replace("\r", "").Replace("\n", "\r\n") + "\r\nConvert now?", "B+ CAD Tools - Convert points", MessageBoxButtons.YesNo) != DialogResult.Yes) return;
+                        if (ok == 0) { MessageBox.Show(sb.ToString() + Ar.T("\r\nNothing to convert."), Ar.T("B+ CAD Tools - Convert points")); return; }
+                        if (MessageBox.Show(sb.ToString().Replace("\r", "").Replace("\n", "\r\n") + Ar.T("\r\nConvert now?"), Ar.T("B+ CAD Tools - Convert points"), MessageBoxButtons.YesNo) != DialogResult.Yes) return;
                         var byId = new Dictionary<SurveyPoint, ObjectId>(); foreach (var p in pts) byId[p.P] = p.Id;
                         Action<string> doIt = null;
                         if (ch.ToCogo)
@@ -153,9 +153,9 @@ namespace BPlus.LiveMap
                         mark.Commit();
                     }
                 }
-                ed.WriteMessage("\n[B+] Converted " + done + " point(s)" + (skipped.Count > 0 ? ", skipped " + skipped.Count : "") + (errors.Count > 0 ? ", " + errors.Count + " failed" : "") + ".\n");
-                foreach (var e in errors.Take(5)) ed.WriteMessage("[B+]   failed " + e + "\n");
-                if (errors.Count > 0) MessageBox.Show("Some points did not convert:\r\n" + string.Join("\r\n", errors.Take(8)), "B+ CAD Tools - Convert points");
+                ed.WriteMessage(Ar.T("\n[B+] Converted ") + done + Ar.T(" point(s)") + (skipped.Count > 0 ? Ar.T(", skipped ") + skipped.Count : "") + (errors.Count > 0 ? ", " + errors.Count + Ar.T(" failed") : "") + ".\n");
+                foreach (var e in errors.Take(5)) ed.WriteMessage(Ar.T("[B+]   failed ") + e + "\n");
+                if (errors.Count > 0) MessageBox.Show(Ar.T("Some points did not convert:\r\n") + string.Join("\r\n", errors.Take(8)), Ar.T("B+ CAD Tools - Convert points"));
             });
         }
     }

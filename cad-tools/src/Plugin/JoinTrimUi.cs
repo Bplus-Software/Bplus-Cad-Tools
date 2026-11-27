@@ -48,7 +48,7 @@ namespace BPlus.LiveMap
                 tol.TextChanged += (s, e) => refresh(); r1.CheckedChanged += (s, e) => refresh(); r2.CheckedChanged += (s, e) => refresh(); r3.CheckedChanged += (s, e) => refresh();
                 refresh();
                 JoinChoice res = null;
-                ok.Click += (s, e) => { res = read(); if (res == null) { MessageBox.Show(f, "The gap must be a number, zero or more.", "B+ CAD Tools"); return; } f.DialogResult = DialogResult.OK; };
+                ok.Click += (s, e) => { res = read(); if (res == null) { MessageBox.Show(f, Ar.T("The gap must be a number, zero or more."), Ar.T("B+ CAD Tools")); return; } f.DialogResult = DialogResult.OK; };
                 cancel.Click += (s, e) => f.DialogResult = DialogResult.Cancel;
                 f.Controls.Add(ok); f.Controls.Add(cancel); f.AcceptButton = ok; f.CancelButton = cancel;
                 return f.ShowDialog() == DialogResult.OK ? res : null;

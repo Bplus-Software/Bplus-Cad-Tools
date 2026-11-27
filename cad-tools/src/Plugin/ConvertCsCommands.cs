@@ -97,10 +97,10 @@ namespace BPlus.LiveMap
                 ok.Click += (s, e) =>
                 {
                     st.ECol = (int)colE.Value; st.NCol = (int)colN.Value; st.Copy = rCopy.Checked;
-                    if (st.From == st.To) { MessageBox.Show(f, "Choose two different coordinate systems.", "B+ CAD Tools"); return; }
-                    if (st.FileMode && (st.InFile.Length == 0 || !File.Exists(st.InFile))) { MessageBox.Show(f, "Choose the coordinate file first.", "B+ CAD Tools"); return; }
-                    if (st.FileMode && st.ECol == st.NCol) { MessageBox.Show(f, "East and North must be different columns.", "B+ CAD Tools"); return; }
-                    if (!st.FileMode && st.Ids.Length == 0) { MessageBox.Show(f, "Select the objects first.", "B+ CAD Tools"); return; }
+                    if (st.From == st.To) { MessageBox.Show(f, Ar.T("Choose two different coordinate systems."), Ar.T("B+ CAD Tools")); return; }
+                    if (st.FileMode && (st.InFile.Length == 0 || !File.Exists(st.InFile))) { MessageBox.Show(f, Ar.T("Choose the coordinate file first."), Ar.T("B+ CAD Tools")); return; }
+                    if (st.FileMode && st.ECol == st.NCol) { MessageBox.Show(f, Ar.T("East and North must be different columns."), Ar.T("B+ CAD Tools")); return; }
+                    if (!st.FileMode && st.Ids.Length == 0) { MessageBox.Show(f, Ar.T("Select the objects first."), Ar.T("B+ CAD Tools")); return; }
                     action = ActConvert; f.DialogResult = DialogResult.OK;
                 };
                 cancel.Click += (s, e) => f.DialogResult = DialogResult.Cancel; f.CancelButton = cancel;
@@ -169,11 +169,11 @@ namespace BPlus.LiveMap
                     int act = ConvertCsUi.Ask(st); if (act == 0) return;
                     if (act == 2)
                     {
-                        var r = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = "\nSelect objects to convert" }, null, new ObjectId[0]); if (r.Status == PromptStatus.OK) st.Ids = r.Value.GetObjectIds(); continue;
+                        var r = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = Ar.T("\nSelect objects to convert") }, null, new ObjectId[0]); if (r.Status == PromptStatus.OK) st.Ids = r.Value.GetObjectIds(); continue;
                     }
                     break;
                 }
-                var a = CoordSys.FromEpsg(st.From); var b = CoordSys.FromEpsg(st.To); if (a == null || b == null) { ed.WriteMessage("\n[B+] Unknown coordinate system.\n"); return; }
+                var a = CoordSys.FromEpsg(st.From); var b = CoordSys.FromEpsg(st.To); if (a == null || b == null) { ed.WriteMessage(Ar.T("\n[B+] Unknown coordinate system.\n")); return; }
                 if (st.FileMode)
                 {
                     a.UnitToMetre = 1; b.UnitToMetre = 1; int n, sk; string txt = File.ReadAllText(st.InFile);
@@ -182,7 +182,7 @@ namespace BPlus.LiveMap
                     while (File.Exists(outPath)) outPath = Path.Combine(Path.GetDirectoryName(st.InFile), Path.GetFileNameWithoutExtension(st.InFile) + "-converted" + (k++) + Path.GetExtension(st.InFile));
                     File.WriteAllText(outPath, outTxt, new System.Text.UTF8Encoding(false));
                     string m = n + " line(s) converted, " + sk + " other line(s) copied unchanged.\r\nSaved: " + outPath + (CoordConvert.IsApprox(a) || CoordConvert.IsApprox(b) ? "\r\nAin el Abd / Aramco: about 18 m accuracy." : "");
-                    ed.WriteMessage("\n[B+] " + m.Replace("\r", "") + "\n"); MessageBox.Show(m, "B+ CAD Tools - Convert coordinates"); return;
+                    ed.WriteMessage("\n[B+] " + m.Replace("\r", "") + "\n"); MessageBox.Show(m, Ar.T("B+ CAD Tools - Convert coordinates")); return;
                 }
                 a.UnitToMetre = unit; b.UnitToMetre = unit; int done = 0, skipped = 0; var kinds = new Dictionary<string, int>();
                 using (doc.LockDocument())
@@ -205,7 +205,7 @@ namespace BPlus.LiveMap
                     tr.Commit();
                 }
                 string detail = string.Join(", ", kinds.Select(kv => kv.Value + " " + kv.Key));
-                ed.WriteMessage("\n[B+] Converted " + done + " object(s) (" + detail + "), skipped " + skipped + ". " + (st.Copy ? "Copies are on layer B+ Converted. " : "") + "UNDO reverses it." + (CoordConvert.IsApprox(a) || CoordConvert.IsApprox(b) ? " Ain el Abd / Aramco: about 18 m accuracy." : "") + "\n");
+                ed.WriteMessage(Ar.T("\n[B+] Converted ") + done + Ar.T(" object(s) (") + detail + Ar.T("), skipped ") + skipped + ". " + (st.Copy ? Ar.T("Copies are on layer B+ Converted. ") : "") + Ar.T("UNDO reverses it.") + (CoordConvert.IsApprox(a) || CoordConvert.IsApprox(b) ? Ar.T(" Ain el Abd / Aramco: about 18 m accuracy.") : "") + "\n");
             });
         }
 

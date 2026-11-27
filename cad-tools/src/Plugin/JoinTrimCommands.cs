@@ -43,7 +43,7 @@ namespace BPlus.LiveMap
             Guard("BPJOIN", () =>
             {
                 var doc = Doc; var ed = doc.Editor;
-                var psr = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = "\nSelect lines, polylines and arcs to join" }, "LWPOLYLINE,LINE,ARC");
+                var psr = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = Ar.T("\nSelect lines, polylines and arcs to join") }, Ar.T("LWPOLYLINE,LINE,ARC"));
                 if (psr.Status != PromptStatus.OK) return;
                 var src = new List<JSrc>(); var paths = new List<JPath>(); int skipped = 0;
                 using (var tr = doc.Database.TransactionManager.StartTransaction())
@@ -51,7 +51,7 @@ namespace BPlus.LiveMap
                     foreach (var id in psr.Value.GetObjectIds()) { var p = ToPath(tr, id, 0, src); if (p == null) skipped++; else paths.Add(p); }
                     tr.Commit();
                 }
-                if (paths.Count < 2) { ed.WriteMessage("\n[B+] Need at least two open shapes to join" + (skipped > 0 ? " (" + skipped + " skipped: closed, 3D or not in the XY plane)" : "") + ".\n"); return; }
+                if (paths.Count < 2) { ed.WriteMessage(Ar.T("\n[B+] Need at least two open shapes to join") + (skipped > 0 ? " (" + skipped + Ar.T(" skipped: closed, 3D or not in the XY plane)") : "") + ".\n"); return; }
                 Func<JoinChoice, string[]> prev = c =>
                 {
                     var r = JoinLogic.Run(paths, c.Tol, c.Mode); int ch = r.Paths.Count(x => x.Changed);
@@ -75,7 +75,7 @@ namespace BPlus.LiveMap
                     }
                     tr.Commit();
                 }
-                ed.WriteMessage("\n[B+] Join: " + made + " polyline(s) made, " + res.Extended + " gaps extended, " + res.Straight + " straight across, " + res.Closed + " closed, " + erased + " original(s) replaced" + (skipped > 0 ? ", " + skipped + " skipped (closed, 3D or tilted)" : "") + ". UNDO reverses it. Not tested in real AutoCAD yet: check the result before relying on it.\n");
+                ed.WriteMessage(Ar.T("\n[B+] Join: ") + made + Ar.T(" polyline(s) made, ") + res.Extended + Ar.T(" gaps extended, ") + res.Straight + Ar.T(" straight across, ") + res.Closed + Ar.T(" closed, ") + erased + Ar.T(" original(s) replaced") + (skipped > 0 ? ", " + skipped + Ar.T(" skipped (closed, 3D or tilted)") : "") + Ar.T(". UNDO reverses it. Not tested in real AutoCAD yet: check the result before relying on it.\n"));
             });
         }
 
@@ -167,20 +167,20 @@ namespace BPlus.LiveMap
             Guard("BPTRIM", () =>
             {
                 var doc = Doc; var ed = doc.Editor; var pre = Sel.Peek(ed);
-                var peo = new PromptEntityOptions("\nPick the closed polyline to use as the boundary: "); peo.SetRejectMessage("\nOnly a polyline can be the boundary."); peo.AddAllowedClass(typeof(AcPoly), true);
+                var peo = new PromptEntityOptions(Ar.T("\nPick the closed polyline to use as the boundary: ")); peo.SetRejectMessage(Ar.T("\nOnly a polyline can be the boundary.")); peo.AddAllowedClass(typeof(AcPoly), true);
                 var per = ed.GetEntity(peo); if (per.Status != PromptStatus.OK) return;
-                double area; Extents3d bx; using (var tr = doc.Database.TransactionManager.StartTransaction()) { var b = (AcPoly)tr.GetObject(per.ObjectId, OpenMode.ForRead); if (!b.Closed) { ed.WriteMessage("\n[B+] The boundary must be a closed polyline.\n"); return; } area = b.Area; bx = b.GeometricExtents; tr.Commit(); }
-                var psr = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = "\nSelect objects to trim (Enter = only the objects crossing or inside the polygon's area)" }, null, pre);
+                double area; Extents3d bx; using (var tr = doc.Database.TransactionManager.StartTransaction()) { var b = (AcPoly)tr.GetObject(per.ObjectId, OpenMode.ForRead); if (!b.Closed) { ed.WriteMessage(Ar.T("\n[B+] The boundary must be a closed polyline.\n")); return; } area = b.Area; bx = b.GeometricExtents; tr.Commit(); }
+                var psr = Sel.Get(ed, new PromptSelectionOptions { MessageForAdding = Ar.T("\nSelect objects to trim (Enter = only the objects crossing or inside the polygon's area)") }, null, pre);
                 ObjectId[] ids;
                 if (psr.Status == PromptStatus.OK) ids = psr.Value.GetObjectIds();
-                else if (psr.Status == PromptStatus.Error) { var all = ed.SelectCrossingWindow(bx.MinPoint, bx.MaxPoint); if (all.Status != PromptStatus.OK) { ed.WriteMessage("\n[B+] No objects in the polygon's area.\n"); return; } ids = all.Value.GetObjectIds(); }
+                else if (psr.Status == PromptStatus.Error) { var all = ed.SelectCrossingWindow(bx.MinPoint, bx.MaxPoint); if (all.Status != PromptStatus.OK) { ed.WriteMessage(Ar.T("\n[B+] No objects in the polygon's area.\n")); return; } ids = all.Value.GetObjectIds(); }
                 else return;
                 ids = ids.Where(i => i != per.ObjectId).ToArray();
                 Func<TrimChoice, string> prev = o => { var c = TrimAll(doc, ids, per.ObjectId, o, false); return c.Cut + " cut, " + c.Deleted + " removed, " + c.Whole + " untouched, " + c.Skipped + " skipped (" + ids.Length + " objects)"; };
                 var ch = JoinTrimUi.Trim("Boundary: closed polyline picked (area " + area.ToString("N1", System.Globalization.CultureInfo.InvariantCulture) + " m\u00B2).", ids.Length, prev); if (ch == null) return;
                 TrimCount n;
                 using (doc.LockDocument()) n = TrimAll(doc, ids, per.ObjectId, ch, true);
-                ed.WriteMessage("\n[B+] Trim: " + n.Cut + " cut, " + n.Deleted + " removed" + (ch.KeepRemoved ? " (moved to BP-TRIMMED)" : "") + ", " + n.Whole + " untouched, " + n.Skipped + " skipped (hatches and other types are not trimmed). UNDO reverses it. Not tested in real AutoCAD yet: check the result before relying on it.\n");
+                ed.WriteMessage(Ar.T("\n[B+] Trim: ") + n.Cut + Ar.T(" cut, ") + n.Deleted + Ar.T(" removed") + (ch.KeepRemoved ? Ar.T(" (moved to BP-TRIMMED)") : "") + ", " + n.Whole + Ar.T(" untouched, ") + n.Skipped + Ar.T(" skipped (hatches and other types are not trimmed). UNDO reverses it. Not tested in real AutoCAD yet: check the result before relying on it.\n"));
             });
         }
     }

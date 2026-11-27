@@ -31,7 +31,7 @@ namespace BPlus.LiveMap
                     refresh();
                     b.Click += (s, e) =>
                     {
-                        f.Hide(); string r = null; try { r = select(key); } catch (System.Exception ex) { r = null; MessageBox.Show("Selection failed: " + ex.Message, "B+ CAD Tools"); }
+                        f.Hide(); string r = null; try { r = select(key); } catch (System.Exception ex) { r = null; MessageBox.Show(Ar.T("Selection failed: ") + ex.Message, Ar.T("B+ CAD Tools")); }
                         if (r != null) status[key] = r; refresh(); f.Show(); f.Activate();
                     };
                     return new Control[] { b, l };
@@ -61,13 +61,13 @@ namespace BPlus.LiveMap
                 {
                     double v; Func<TextBox, double> g = t => double.TryParse(t.Text.Trim().Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out v) ? v : double.NaN;
                     double cell = g(c), sf = g(sw), lev = g(lv), grd = g(gr);
-                    if (double.IsNaN(cell) || cell <= 0) { MessageBox.Show(f, "The grid cell must be a number above 0.", "B+ CAD Tools"); return; }
-                    if (double.IsNaN(sf) || sf <= 0) { MessageBox.Show(f, "The factor must be a number above 0 (1.00 = none).", "B+ CAD Tools"); return; }
-                    if (c2.Checked && double.IsNaN(lev)) { MessageBox.Show(f, "Type the flat level as a number.", "B+ CAD Tools"); return; }
-                    if (c3.Checked && double.IsNaN(grd)) { MessageBox.Show(f, "Type the grade as a number (%).", "B+ CAD Tools"); return; }
-                    if (!has(e0.Checked ? "ex_surf" : "ex_pts")) { MessageBox.Show(f, "Existing ground: press Select < next to the ticked row first.", "B+ CAD Tools"); return; }
-                    if ((c0.Checked && !has("cmp_surf")) || (c1.Checked && !has("cmp_pts"))) { MessageBox.Show(f, "Compare with: press Select < next to the ticked row first.", "B+ CAD Tools"); return; }
-                    if (a1.Checked && !has("poly")) { MessageBox.Show(f, "Area: press Select < to pick the closed polyline first.", "B+ CAD Tools"); return; }
+                    if (double.IsNaN(cell) || cell <= 0) { MessageBox.Show(f, Ar.T("The grid cell must be a number above 0."), Ar.T("B+ CAD Tools")); return; }
+                    if (double.IsNaN(sf) || sf <= 0) { MessageBox.Show(f, Ar.T("The factor must be a number above 0 (1.00 = none)."), Ar.T("B+ CAD Tools")); return; }
+                    if (c2.Checked && double.IsNaN(lev)) { MessageBox.Show(f, Ar.T("Type the flat level as a number."), Ar.T("B+ CAD Tools")); return; }
+                    if (c3.Checked && double.IsNaN(grd)) { MessageBox.Show(f, Ar.T("Type the grade as a number (%)."), Ar.T("B+ CAD Tools")); return; }
+                    if (!has(e0.Checked ? Ar.T("ex_surf") : Ar.T("ex_pts"))) { MessageBox.Show(f, Ar.T("Existing ground: press Select < next to the ticked row first."), Ar.T("B+ CAD Tools")); return; }
+                    if ((c0.Checked && !has(Ar.T("cmp_surf"))) || (c1.Checked && !has(Ar.T("cmp_pts")))) { MessageBox.Show(f, Ar.T("Compare with: press Select < next to the ticked row first."), Ar.T("B+ CAD Tools")); return; }
+                    if (a1.Checked && !has(Ar.T("poly"))) { MessageBox.Show(f, Ar.T("Area: press Select < to pick the closed polyline first."), Ar.T("B+ CAD Tools")); return; }
                     res = new CutFillChoice { Existing = e0.Checked ? 0 : 1, Proposed = c0.Checked ? 0 : c1.Checked ? 1 : c2.Checked ? 2 : 3, Area = a0.Checked ? 0 : 1, Level = double.IsNaN(lev) ? 0 : lev, Grade = double.IsNaN(grd) ? 0 : grd, Cell = cell, Swell = sf }; f.DialogResult = DialogResult.OK;
                 };
                 cancel.Click += (s, e) => f.DialogResult = DialogResult.Cancel;
