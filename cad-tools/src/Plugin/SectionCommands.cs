@@ -165,7 +165,7 @@ namespace BPlus.LiveMap
                 SelResult psr = null; try { psr = Sel.Get(ed, po, "POINT,AECC_COGO_POINT"); } catch { psr = null; }
                 bool havePts = psr != null && psr.Status == PromptStatus.OK && psr.Value.Count > 0;
                 double length; using (var tr = db.TransactionManager.StartTransaction()) { var cv0 = (Curve)tr.GetObject(er.ObjectId, OpenMode.ForRead); length = cv0.GetDistanceAtParameter(cv0.EndParam); tr.Commit(); }
-                double scale = DrawingScale(db), th = ProfileTextHeight(scale);
+                double scale = DrawingScale(db), th = scale > 1.0001 ? 0.0025 * scale : ProfileMath.AutoTextHeight(30);
                 SectionUi.Choice ch; if (!SectionUi.Ask(length, havePts, th, out ch)) return;
                 var all = new List<SecPt>(); var notes = new List<string>(); var models = new List<ProfModel>(); var halfs = new List<double>(); int skipped = 0;
                 // single-station picks first (before any transaction)

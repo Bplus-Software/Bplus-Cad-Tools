@@ -487,3 +487,11 @@ namespace BPlus.LiveMap.Core.Tests
     }
 }
 namespace BPlus.LiveMap.Core.Tests { public class AutoTextTests { [Xunit.Fact] public void AutoText() { Xunit.Assert.Equal(2, ProfileMath.AutoTextHeight(240), 6); Xunit.Assert.Equal(20, ProfileMath.AutoTextHeight(2400), 6); Xunit.Assert.True(ProfileMath.AutoTextHeight(0) > 0); } } }
+namespace BPlus.LiveMap.Core.Tests { public class SectionCrowdTests { [Xunit.Fact] public void FewGridLinesAndThinLabels() {
+ var g = new System.Collections.Generic.List<SecPt>(); for (int i = 0; i <= 60; i++) g.Add(new SecPt { Id = (i + 1).ToString(), Sta = 0, Off = -15 + i * 0.5, Z = 50 + 0.2 * System.Math.Sin(i / 5.0) });
+ var road = new RoadSpec { LeftEdge = -7, RightEdge = 7, Centre = 0, Lanes = new[] { 3.5, 3.5, 3.5, 3.5 }, SwL = 1.8, SwR = 1.8 };
+ double hu; string w; var m = SectionMath.Build(g, 15, 1, double.NaN, 1.0, true, road, "s", out hu, out w);
+ Xunit.Assert.True(m.Segs.Count(s => s.Kind == "grid" && System.Math.Abs(s.Y1 - s.Y2) < 1e-9) <= 12);
+ Xunit.Assert.True(m.Texts.Count(t => t.Kind == "pt") <= 25); Xunit.Assert.Contains("left out", w);
+ Xunit.Assert.True(m.Texts.Count(t => t.Kind == "elev") <= 14);
+ } } }

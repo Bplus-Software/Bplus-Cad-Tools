@@ -108,7 +108,7 @@ namespace BPlus.LiveMap.Core
             if (ag != null && ag.Segs.Count > 0) { zs.Add(ag.MinZ); zs.Add(ag.MaxZ); }
             double minZ = zs.Min(), maxZ = zs.Max(); if (double.IsNaN(datum)) datum = ProfileMath.AutoDatum(minZ, maxZ);
             var m = new ProfModel { MinZ = minZ, MaxZ = maxZ, Datum = datum, Length = 2 * hw };
-            double top = Math.Max(maxZ - datum, 0.1), es = ProfileMath.NiceStep(top / 4.0); m.ElevStep = es;
+            double top = Math.Max(maxZ - datum, 0.1), es = Math.Max(ProfileMath.NiceStep(top / 4.0), ProfileMath.NiceStep(3.0 * textH / ve)); m.ElevStep = es; /* level lines at least 3 text heights apart on the drawing */
             double dimBand = road != null || ag != null ? 7 * textH : 0;
             int nz = (int)Math.Ceiling((top + dimBand / ve) / es - 1e-9); if (nz < 1) nz = 1; double yTop = nz * es * ve;
             double offStep = hw > 30 ? 10 : 5; m.StaStep = offStep;
@@ -125,9 +125,12 @@ namespace BPlus.LiveMap.Core
                 m.Texts.Add(new ProfText { X = -textH * 0.5, Y = y, S = ProfileMath.F2(datum + k * es), Align = 2, Kind = "elev" });
             }
             m.Texts.Add(new ProfText { X = 0, Y = -textH * 3.2, S = title + "   datum " + ProfileMath.F2(datum) + " m   x" + ve.ToString("0.##", CultureInfo.InvariantCulture), Align = 0, Kind = "title" });
+            double lastLab = double.NegativeInfinity; int hidden = 0;
             foreach (var p in g)
             {
                 m.Ground.Add(new[] { X(p.Off), (p.Z - datum) * ve });
+                if (label && X(p.Off) - lastLab < textH * 1.3) { hidden++; continue; }
+                if (label) lastLab = X(p.Off);
                 if (label) m.Texts.Add(new ProfText { X = X(p.Off), Y = -textH * 4.4, S = (p.Id != "" ? p.Id + "  " : "") + ProfileMath.F2(p.Z), Align = 2, Kind = "pt", Rot = 90 });
             }
             if (road != null)
@@ -151,6 +154,7 @@ namespace BPlus.LiveMap.Core
                 if (road.SwR > 0) m.Texts.Add(new ProfText { X = X(r + road.SwR / 2), Y = yDim, S = road.SwR.ToString("0.###", CultureInfo.InvariantCulture), Align = 1, Kind = "dim" });
                 m.Texts.Add(new ProfText { X = X((l + r) / 2), Y = yDim + textH * 2.2, S = "road " + (r - l).ToString("0.###", CultureInfo.InvariantCulture) + " m,  centre level " + ProfileMath.F2(cl), Align = 1, Kind = "dim" });
             }
+            if (hidden > 0) warning = (warning == "" ? "" : warning + "; ") + hidden + " point label(s) left out because the points are closer than the text (use a smaller text height or a wider frame to see all)";
             if (ag != null)
             {
                 foreach (var sg in ag.Segs) m.Segs.Add(new ProfSeg { X1 = X(sg.X1), Y1 = (sg.Y1 - datum) * ve, X2 = X(sg.X2), Y2 = (sg.Y2 - datum) * ve, Kind = sg.Kind });
