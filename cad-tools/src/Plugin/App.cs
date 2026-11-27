@@ -14,7 +14,7 @@ namespace BPlus.LiveMap
 {
     public class App : IExtensionApplication
     {
-        public static string Version = "0.4.19-experimental";
+        public static string Version = "0.4.20-experimental";
         public void Initialize()
         {
             try

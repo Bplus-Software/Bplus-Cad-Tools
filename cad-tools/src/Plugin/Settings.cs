@@ -123,7 +123,7 @@ namespace BPlus.LiveMap
         static readonly string[] Orders = { "PENZD", "PNEZD", "PENZ", "PNEZ", "PEN" };
         public static void Show()
         {
-            using (var f = Theme.Base("B+ CAD Tools - Settings", 520, 440))
+            using (var f = Theme.Base("B+ CAD Tools - Settings", 520, 500))
             {
                 f.Controls.Add(Theme.Lbl("Version " + App.Version + ". Updates come from GitHub: Bplus-Software/Bplus-Cad-Tools.", 16, 14, 490, true));
                 var auto = new CheckBox { Left = 16, Top = 44, Width = 480, Text = "Check for updates when AutoCAD starts (at most once a day)", Checked = Config.AutoUpdate, ForeColor = Theme.Text, BackColor = Color.Transparent };
@@ -134,10 +134,15 @@ namespace BPlus.LiveMap
                 f.Controls.Add(Theme.Lbl("Default text height for point labels (drawing units)", 16, 148, 310));
                 var th = new TextBox { Left = 330, Top = 145, Width = 80, BorderStyle = BorderStyle.FixedSingle, Text = Config.TextHeight.ToString(System.Globalization.CultureInfo.InvariantCulture) }; Theme.Style(th);
                 f.Controls.Add(Theme.Lbl("Lengths are shown in m and areas in m2.", 16, 180, 480, true));
-                var codes = Theme.Btn("Edit point codes...", 16, 214, 160); var map = Theme.Btn("Live Map settings and Google key...", 184, 214, 250);
+                var codes = Theme.Btn("Point codes (rules for import and Connect points)...", 16, 40, 400); var map = Theme.Btn("Live Map settings and Google key...", 184, 214, 250);
                 var upd = Theme.Btn("Check for updates now", 16, 258, 180, true); var rel = Theme.Btn("Open releases page", 204, 258, 160); var logb = Theme.Btn("Open log folder", 372, 258, 130);
                 var info = Theme.Lbl("Update: the installer is downloaded, its SHA-256 is checked, and you confirm before it runs.", 16, 296, 490, true); info.Height = 36;
-                var ok = Theme.Btn("Save", 324, 396, 85, true); var cancel = Theme.Btn("Cancel", 417, 396, 85);
+                var ok = Theme.Btn("Save", 324, 456, 85, true); var cancel = Theme.Btn("Cancel", 417, 456, 85);
+                var park = Theme.Btn("Parking sizes...", 16, 414, 160); park.Click += (s, e) => ParkingUi.EditPresets();
+                var road = Theme.Btn("Road section presets...", 184, 414, 200); road.Click += (s, e) => SectionUi.EditPresets();
+                var showMap = Theme.Btn("Show / hide live map", 16, 378, 200); var mapOpt = Theme.Btn("Map type and opacity...", 224, 378, 200);
+                showMap.Click += (s, e) => { try { var dd = AcApp.DocumentManager.MdiActiveDocument; f.DialogResult = DialogResult.Cancel; if (dd != null) dd.SendStringToExecute("BPGMAP ", true, false, false); } catch { } };
+                mapOpt.Click += (s, e) => { try { var dd = AcApp.DocumentManager.MdiActiveDocument; f.DialogResult = DialogResult.Cancel; if (dd != null) dd.SendStringToExecute("BPMAPOPT ", true, false, false); } catch { } };
                 codes.Click += (s, e) => { var t = SurveyUi.Codes(SurveyCad.RulesText()); if (t != null) SurveyCad.SaveRulesText(t); };
                 map.Click += (s, e) => SettingsDialog.Show();
                 upd.Click += (s, e) => { try { var dd = AcApp.DocumentManager.MdiActiveDocument; f.DialogResult = DialogResult.Cancel; if (dd != null) dd.SendStringToExecute("BPUPDATE ", true, false, false); } catch { } };
@@ -149,7 +154,8 @@ namespace BPlus.LiveMap
                     Config.AutoUpdate = auto.Checked; Config.PointOrder = (string)ord.SelectedItem; Config.Decimals = (int)dec.Value; Config.TextHeight = h; f.DialogResult = DialogResult.OK;
                 };
                 cancel.Click += (s, e) => f.DialogResult = DialogResult.Cancel;
-                f.Controls.AddRange(new Control[] { auto, ord, dec, th, codes, map, upd, rel, logb, info, ok, cancel }); f.CancelButton = cancel;
+                f.Controls.AddRange(new Control[] { auto, ord, dec, th, codes, map, upd, rel, logb, info, showMap, mapOpt, park, road, ok, cancel }); f.CancelButton = cancel;
+                foreach (Control c in f.Controls) if (c != codes && c != ok && c != cancel && c != showMap && c != mapOpt && c != park && c != road && c.Top > 20) c.Top += 40;
                 f.ShowDialog();
             }
         }

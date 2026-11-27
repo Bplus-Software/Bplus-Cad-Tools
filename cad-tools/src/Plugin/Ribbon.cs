@@ -31,8 +31,8 @@ namespace BPlus.LiveMap
                 var rc = ComponentManager.Ribbon; if (rc == null) return false;
                 foreach (var t in rc.Tabs) if (t.Id == TabId) return true;
                 var tab = new RibbonTab { Title = "B+ CAD Tools", Id = TabId };
-                AddStackPanel(tab, "Points", 3, L("Import points", "BPIMPORT ", "import", "Import a points file (txt, csv, xlsx) as points with codes and layers"), L("Show / hide", "BPISOLATE ", "layers", "Show or hide point categories"), L("Codes", "BPCODES ", "codes", "Edit the point code rules"), L("Connect points", "BPCONNECT ", "connect", "Draw lines through points by code and point number"), L("Vertices to points", "BPVERTS ", "verts", "Make a numbered point at every vertex"), L("Convert points", "BPCONVPTS ", "convpts", "Convert AutoCAD points to Civil 3D COGO points and back. Needs Civil 3D"), L("QA / QC", "BPQAQC ", "qa", "Check points: repeated numbers, duplicates, missing code or elevation, spikes"), L("Shift", "BPSHIFT ", "shift", "Move the selection by dE, dN, dZ"));
-                AddStackPanel(tab, "Live Map", 3, L("Live map", "BPGMAP ", "map", "Show or hide the live Google map behind the drawing"), L("Map options", "BPMAPOPT ", "gear", "Map type, opacity, refresh, coordinate system and Google key"), L("Coordinate system", "BPGMAPCS ", "cs", "Choose the coordinate system of the drawing: search by name, EPSG or country"), L("Convert coordinates", "BPCONVCS ", "convcs", "Convert selected objects or a coordinate file from one coordinate system to another"));
+                AddStackPanel(tab, "Points", 3, L("Import points", "BPIMPORT ", "import", "Import a points file (txt, csv, xlsx) as points with codes and layers"), L("Show / hide", "BPISOLATE ", "layers", "Show or hide point categories"), L("Connect points", "BPCONNECT ", "connect", "Draw lines through points by code and point number"), L("Vertices to points", "BPVERTS ", "verts", "Make a numbered point at every vertex"), L("Convert points", "BPCONVPTS ", "convpts", "Convert AutoCAD points to Civil 3D COGO points and back. Needs Civil 3D"), L("QA / QC", "BPQAQC ", "qa", "Check points: repeated numbers, duplicates, missing code or elevation, spikes"), L("Shift", "BPSHIFT ", "shift", "Move the selection by dE, dN, dZ"), L("Quick profile", "BPPROFILE ", "profile", "Quick longitudinal profile along a line from points or the line's own levels (drawn as plain geometry, not a Civil 3D profile)"), L("Parking", "BPPARKING ", "parking", "Draw parking stalls (parallel, 90 or 45 degrees) along a line, with editable sizes"), L("Quick section", "BPSECTION ", "section", "Cross-sections along a line from points and/or a typical or existing road (lanes, sidewalks). Drawn as plain geometry, not Civil 3D sections"));
+                AddStackPanel(tab, "Coordinates", 3, L("Coordinate system", "BPGMAPCS ", "cs", "Choose the coordinate system of the drawing: search by name, EPSG or country"), L("Convert coordinates", "BPCONVCS ", "convcs", "Convert selected objects or a coordinate file from one coordinate system to another"));
                 AddStackPanel(tab, "Edit", 3, L("Join", "BPJOIN ", "join", "Join lines, polylines and arcs, closing small gaps"), L("Trim", "BPTRIM ", "trim", "Trim to a closed boundary: keep inside or outside"), L("Label", "BPLABEL ", "label", "Write length and area next to the selected polylines"), L("Auto leader", "BPLEADER ", "leader", "Select shapes: make a leader from each with its length or area"), L("Merge hatch", "BPHATCHMERGE ", "merge", "Combine several hatches into one"), L("Split hatch", "BPHATCHSPLIT ", "split", "Split a hatch into one hatch per separate area"));
                 AddStackPanel(tab, "Measure", 3, L("Area", "BPAREA ", "area", "Area of closed polylines in m2, with perimeter in m"), L("Distance", "BPDIST ", "dist", "Distance, azimuth and bearing between two points"), L("Chain length", "BPCHAIN ", "chain", "Length along many picked points, with each segment"), L("Area by points", "BPAREAPTS ", "areapts", "Area and perimeter of picked corners"), L("Angle", "BPANGLE ", "angle", "Angle between two lines, from three points"), L("Pick coordinates", "BPPICK ", "pickxy", "E, N, Z of picked points, with latitude and longitude when a coordinate system is set"));
                 AddStackPanel(tab, "Quantities", 3, L("Sinks", "BPSINKS ", "sinks", "Find where water collects on a surface: sinks with E, N, Z, depth, area and volume"), L("Cut and fill", "BPCUTFILL ", "cutfill", "Cut and fill volumes (m3) between the ground and another surface, a level or a plane"), L("Lengths", "BPLENGTHS ", "lengths", "List length and area of selected polylines, with table, CSV and labels"));
@@ -169,6 +169,23 @@ namespace BPlus.LiveMap
                 else if (kind == "qa")
                 {
                     g.DrawEllipse(white, k(4), k(4), k(24), k(24)); g.DrawLines(white, new[] { new PointF(k(10), k(17)), new PointF(k(14), k(21)), new PointF(k(22), k(11)) });
+                }
+                else if (kind == "section")
+                {
+                    g.DrawLine(white, k(3), k(27), k(29), k(27));
+                    g.DrawLines(white, new[] { new PointF(k(3), k(20)), new PointF(k(11), k(20)), new PointF(k(13), k(15)), new PointF(k(19), k(15)), new PointF(k(21), k(20)), new PointF(k(29), k(20)) });
+                    g.DrawLine(white, k(16), k(5), k(16), k(15));
+                }
+                else if (kind == "parking")
+                {
+                    g.DrawLine(white, k(3), k(26), k(29), k(26));
+                    for (int i = 0; i < 4; i++) g.DrawLine(white, k(3 + i * 7), k(26), k(3 + i * 7), k(8));
+                    g.DrawLine(white, k(3), k(8), k(24), k(8)); g.DrawLine(white, k(24), k(8), k(24), k(26));
+                }
+                else if (kind == "profile")
+                {
+                    g.DrawLine(white, k(5), k(4), k(5), k(27)); g.DrawLine(white, k(5), k(27), k(28), k(27));
+                    g.DrawLines(white, new[] { new PointF(k(5), k(20)), new PointF(k(11), k(13)), new PointF(k(17), k(18)), new PointF(k(23), k(8)), new PointF(k(28), k(12)) });
                 }
                 else if (kind == "shift")
                 {

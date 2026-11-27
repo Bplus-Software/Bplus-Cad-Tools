@@ -318,3 +318,108 @@ namespace BPlus.LiveMap.Core.Tests3
         [Fact] public void TenIsNewerThanNine() { Assert.True(Updater.ParseVersion("0.4.10") > Updater.ParseVersion("0.4.9")); }
     }
 }
+
+namespace BPlus.LiveMap.Core.Tests
+{
+    public class ProfileTests
+    {
+        [Xunit.Fact]
+        public void BuildsGroundAndGrid()
+        {
+            var pts = new System.Collections.Generic.List<ProfPt> { new ProfPt { Id = "2", Sta = 120, Z = 101.5 }, new ProfPt { Id = "1", Sta = 0, Z = 100 }, new ProfPt { Id = "3", Sta = 260, Z = 99.25, Off = 1.5 } };
+            var m = ProfileMath.Build(pts, 10, 100, 2.5, double.NaN, true, true);
+            Xunit.Assert.Equal(3, m.Ground.Count);
+            Xunit.Assert.Equal(0, m.Ground[0][0]); Xunit.Assert.Equal(120, m.Ground[1][0]);
+            Xunit.Assert.True(m.Datum < 99.25); Xunit.Assert.Equal((101.5 - m.Datum) * 10, m.Ground[1][1], 6);
+            Xunit.Assert.Equal(4, m.Table.Count); Xunit.Assert.Equal("0+120.00", m.Table[2][1]);
+            Xunit.Assert.Equal(1, ProfileMath.NiceStep(0.7)); Xunit.Assert.Equal(50, ProfileMath.NiceStep(34));
+            Xunit.Assert.Equal(1, ProfileMath.DefaultInterval(8));
+        }
+        [Xunit.Fact]
+        public void RejectsBadInput()
+        {
+            Xunit.Assert.Throws<System.ArgumentException>(() => ProfileMath.Build(new ProfPt[0], 10, 10, 1, 0, false, false));
+            Xunit.Assert.Throws<System.ArgumentException>(() => ProfileMath.Build(new[] { new ProfPt() }, 0, 10, 1, 0, false, false));
+        }
+    }
+}
+
+namespace BPlus.LiveMap.Core.Tests
+{
+    public class ParkingTests
+    {
+        [Xunit.Fact]
+        public void DefaultsMatchMinistry()
+        {
+            var d = ParkingMath.Defaults();
+            Xunit.Assert.Equal(2.5, d[0].Width); Xunit.Assert.Equal(6.5, d[0].Length); Xunit.Assert.Equal(2.8, d[1].Width); Xunit.Assert.Equal(5.5, d[2].Length);
+            Xunit.Assert.Equal(6.5, d[0].Pitch, 9); Xunit.Assert.Equal(2.8, d[1].Pitch, 9); Xunit.Assert.Equal(2.8 / System.Math.Sin(System.Math.PI / 4), d[2].Pitch, 9);
+            Xunit.Assert.Equal(2.5, d[0].Depth, 9); Xunit.Assert.Equal(5.5, d[1].Depth, 9); Xunit.Assert.Equal(5.5 * System.Math.Sin(System.Math.PI / 4), d[2].Depth, 9);
+        }
+        [Xunit.Fact]
+        public void FitAndCorners()
+        {
+            var d = ParkingMath.Defaults();
+            Xunit.Assert.Equal(6, ParkingMath.Fit(16.8, d[1])); Xunit.Assert.Equal(5, ParkingMath.Fit(16.79, d[1])); Xunit.Assert.Equal(4, ParkingMath.Fit(26.0, d[0]));
+            var c = ParkingMath.Corners(0, 0, 2.8, 0, 0, 1, d[1]);
+            Xunit.Assert.Equal(new[] { 0, 0, 2.8, 0, 2.8, 5.5, 0, 5.5 }, c);
+            var a = ParkingMath.Corners(0, 0, d[2].Pitch, 0, 0, 1, d[2]);
+            double lean = 5.5 * System.Math.Cos(System.Math.PI / 4); Xunit.Assert.Equal(d[2].Pitch + lean, a[4], 9); Xunit.Assert.Equal(d[2].Depth, a[5], 9);
+            // right side of a line pointing east is south
+            var r = ParkingMath.Corners(0, 0, 6.5, 0, 0, -1, d[0]); Xunit.Assert.Equal(-2.5, r[5], 9);
+        }
+        [Xunit.Fact]
+        public void PresetsSaveAndRejectBadValues()
+        {
+            var l = ParkingMath.Defaults(); l[1].Width = 3.0; var back = ParkingMath.Unpack(ParkingMath.Pack(l));
+            Xunit.Assert.Equal(3.0, back[1].Width); Xunit.Assert.Equal(2.5, back[0].Width);
+            var bad = ParkingMath.Unpack("Parallel|-1|6.5|0|3.5;90 degrees|abc|5.5|90|6;45 degrees|2.8|5.5|60|3.5");
+            Xunit.Assert.Equal(2.5, bad[0].Width); Xunit.Assert.Equal(2.8, bad[1].Width); Xunit.Assert.Equal(45, bad[2].Angle);
+            Xunit.Assert.Equal(2.5, ParkingMath.Unpack("").First().Width);
+        }
+    }
+}
+
+namespace BPlus.LiveMap.Core.Tests
+{
+    public class SectionTests
+    {
+        static System.Collections.Generic.List<SecPt> Pts() { return new System.Collections.Generic.List<SecPt> { new SecPt { Id = "a", Sta = 100, Off = -8, Z = 50.0 }, new SecPt { Id = "b", Sta = 101, Off = 0, Z = 50.4 }, new SecPt { Id = "c", Sta = 99, Off = 6, Z = 50.1 }, new SecPt { Id = "far", Sta = 140, Off = 1, Z = 55 }, new SecPt { Id = "wide", Sta = 100, Off = 30, Z = 55 } }; }
+        [Xunit.Fact]
+        public void SelectsStripAndWidth()
+        {
+            var s = SectionMath.Select(Pts(), 100, 2.5, 15);
+            Xunit.Assert.Equal(3, s.Count); Xunit.Assert.Equal("a", s[0].Id); Xunit.Assert.Equal("c", s[2].Id);
+            Xunit.Assert.Equal(50.2, SectionMath.GroundAt(s, -4), 6); Xunit.Assert.True(double.IsNaN(SectionMath.GroundAt(s, 20)));
+        }
+        [Xunit.Fact]
+        public void StationsAndLanes()
+        {
+            var st = SectionMath.Stations(65, 20); Xunit.Assert.Equal(new double[] { 0, 20, 40, 60, 65 }, st.ToArray());
+            Xunit.Assert.Equal(new double[] { 3.55, 3.55, 3.55, 3.55 }, SectionMath.EqualLanes(14.2, 4), new DoubleCmp());
+            Xunit.Assert.Equal(9, SectionMath.Lerp(8, 10, 50, 100), 9);
+        }
+        class DoubleCmp : System.Collections.Generic.IEqualityComparer<double> { public bool Equals(double a, double b) { return System.Math.Abs(a - b) < 1e-9; } public int GetHashCode(double d) { return 0; } }
+        [Xunit.Fact]
+        public void BuildsRoadSection()
+        {
+            var road = new RoadSpec { LeftEdge = -7, RightEdge = 7, Centre = 0, Lanes = new[] { 3.5, 3.5, 3.5, 3.5 }, SwL = 1.8, SwR = 2.0, Crossfall = 2, Kerb = 0.15 };
+            double hw; string w; var m = SectionMath.Build(SectionMath.Select(Pts(), 100, 2.5, 15), 15, 1, double.NaN, 0.5, true, road, "Station 0+100.00", out hw, out w);
+            Xunit.Assert.Equal(15, hw, 6); Xunit.Assert.Equal("", w);
+            Xunit.Assert.Equal(3, m.Ground.Count);
+            var crown = m.Segs.Find(s => s.Kind == "road"); Xunit.Assert.Equal(15 - 7, crown.X1, 6);
+            Xunit.Assert.Contains(m.Texts, t => t.Kind == "dim" && t.S == "3.5"); Xunit.Assert.Contains(m.Texts, t => t.S.StartsWith("road 14"));
+            // crown level taken from the ground at the centre (50.4), edge falls 2% over 7 m
+            Xunit.Assert.Equal(((50.4 - 0.02 * 7) - m.Datum) * 1, m.Segs.Find(s => s.Kind == "road").Y1, 6);
+            double hw2; string w2; SectionMath.Build(new System.Collections.Generic.List<SecPt>(), 15, 1, 0, 0.5, false, road, "x", out hw2, out w2); Xunit.Assert.NotEqual("", w2);
+            Xunit.Assert.Throws<System.ArgumentException>(() => { double a; string b; SectionMath.Build(new System.Collections.Generic.List<SecPt>(), 15, 1, 0, 1, false, null, "x", out a, out b); });
+        }
+        [Xunit.Fact]
+        public void RoadPresetsSaveAndReject()
+        {
+            var l = SectionMath.RoadDefaults(); l[0].LaneWidth = 3.6; var back = SectionMath.Unpack(SectionMath.Pack(l));
+            Xunit.Assert.Equal(3.6, back[0].LaneWidth); Xunit.Assert.Equal(6, back[2].Lanes);
+            var bad = SectionMath.Unpack("Local|0|3.5|1.8|0|0.15|2;Collector|4|x|1.8|0|0.15|2"); Xunit.Assert.Equal(2, bad[0].Lanes); Xunit.Assert.Equal(3.5, bad[1].LaneWidth);
+        }
+    }
+}
