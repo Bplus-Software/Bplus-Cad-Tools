@@ -469,3 +469,20 @@ namespace BPlus.LiveMap.Core.Tests
         }
     }
 }
+namespace BPlus.LiveMap.Core.Tests
+{
+    public class ProfileSummaryTests
+    {
+        [Xunit.Fact]
+        public void SummaryHeightAndOptions()
+        {
+            var pts = new System.Collections.Generic.List<ProfPt> { new ProfPt { Id = "1", Sta = 0, Z = 50 }, new ProfPt { Id = "2", Sta = 40, Z = 48.5 }, new ProfPt { Id = "3", Sta = 100, Z = 51 }, new ProfPt { Id = "4", Sta = 160, Z = 49 } };
+            var m = ProfileMath.Build(pts, 10, 40, 2, double.NaN, true, true, new ProfStyle { Height = 30 });
+            Xunit.Assert.Equal("49.62", m.Summary[1][2]); Xunit.Assert.Equal("51.00", m.Summary[2][2]); Xunit.Assert.Equal("48.50", m.Summary[3][2]); Xunit.Assert.Equal("0+040.00", m.Summary[3][1]); Xunit.Assert.Equal("No 2", m.Summary[3][3]);
+            Xunit.Assert.Equal(30, m.Segs.Where(s => s.Kind == "frame").Max(s => s.Y2), 6);
+            var m2 = ProfileMath.Build(pts, 10, 40, 2, double.NaN, true, true, new ProfStyle { Grid = false, Drops = false, MarkExtremes = false, AvgLine = false });
+            Xunit.Assert.DoesNotContain(m2.Segs, s => s.Kind == "grid" || s.Kind == "drop" || s.Kind == "mark" || s.Kind == "avg");
+            Xunit.Assert.Contains(m.Segs, s => s.Kind == "avg"); Xunit.Assert.Contains(m.Segs, s => s.Kind == "mark");
+        }
+    }
+}

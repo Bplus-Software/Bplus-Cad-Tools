@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ApplicationPackage SchemaVersion="1.0" AutodeskProduct="AutoCAD" Name="B+ CAD Tools" AppVersion="0.4.21" Description="BPlus tools for AutoCAD and Civil 3D: live Google map and survey points (experimental)" Author="BPlus Software" ProductType="Application" ProductCode="{6F1D2A52-3B0E-4C77-9E4B-5B1A7C0D9A12}" UpgradeCode="{0B7E4C0A-8D1F-4E5A-A2C3-7D9F6A1B2C44}">
+<ApplicationPackage SchemaVersion="1.0" AutodeskProduct="AutoCAD" Name="B+ CAD Tools" AppVersion="0.4.22" Description="BPlus tools for AutoCAD and Civil 3D: live Google map and survey points (experimental)" Author="BPlus Software" ProductType="Application" ProductCode="{6F1D2A52-3B0E-4C77-9E4B-5B1A7C0D9A12}" UpgradeCode="{0B7E4C0A-8D1F-4E5A-A2C3-7D9F6A1B2C44}">
   <CompanyDetails Name="BPlus Software" />
   <Components Description="AutoCAD / Civil 3D 2021-2024 (.NET Framework 4.8)">
     <RuntimeRequirements OS="Win64" Platform="AutoCAD*" SeriesMin="R24.0" SeriesMax="R24.3" />
-    <ComponentEntry AppName="BPlusCadTools" Version="0.4.21" ModuleName="./Contents/net48/BPlus.CadTools.dll" AppType=".NET" LoadOnAutoCADStartup="True" AppDescription="B+ CAD Tools">
+    <ComponentEntry AppName="BPlusCadTools" Version="0.4.22" ModuleName="./Contents/net48/BPlus.CadTools.dll" AppType=".NET" LoadOnAutoCADStartup="True" AppDescription="B+ CAD Tools">
       <Commands GroupName="BPLUSCADTOOLS">
         <Command Local="BPGMAP" Global="BPGMAP" />
         <Command Local="BPGMAPSET" Global="BPGMAPSET" />
@@ -62,7 +62,7 @@
   </Components>
   <Components Description="AutoCAD / Civil 3D 2025-2026 (.NET 8)">
     <RuntimeRequirements OS="Win64" Platform="AutoCAD*" SeriesMin="R25.0" SeriesMax="R25.1" />
-    <ComponentEntry AppName="BPlusCadTools" Version="0.4.21" ModuleName="./Contents/net8/BPlus.CadTools.dll" AppType=".NET" LoadOnAutoCADStartup="True" AppDescription="B+ CAD Tools">
+    <ComponentEntry AppName="BPlusCadTools" Version="0.4.22" ModuleName="./Contents/net8/BPlus.CadTools.dll" AppType=".NET" LoadOnAutoCADStartup="True" AppDescription="B+ CAD Tools">
       <Commands GroupName="BPLUSCADTOOLS">
         <Command Local="BPGMAP" Global="BPGMAP" />
         <Command Local="BPGMAPSET" Global="BPGMAPSET" />

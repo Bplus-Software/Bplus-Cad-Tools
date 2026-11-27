@@ -13,8 +13,16 @@ namespace BPlus.LiveMap
     {
         const string TabId = "BPLUS_CADTOOLS_TAB";
         static bool _hooked;
+        const string TabTitle = "B+ CAD Tools";
+        static DateTime _last = DateTime.MinValue; static bool _wsHooked; static int _readded;
         public static void Install()
         {
+            if (!_wsHooked)
+            {   // kept for the whole session: a workspace change or a ribbon reload can drop a tab built only in code
+                _wsHooked = true;
+                try { AcApp.SystemVariableChanged += (s, e) => { if (string.Equals(e.Name, "WSCURRENT", StringComparison.OrdinalIgnoreCase)) _last = DateTime.MinValue; }; } catch { }
+                AcApp.Idle += OnWatch;
+            }
             if (TryBuild()) return;
             if (_hooked) return; _hooked = true;
             ComponentManager.ItemInitialized += OnInit;
@@ -24,12 +32,32 @@ namespace BPlus.LiveMap
         static void OnIdle(object s, EventArgs e) { if (ComponentManager.Ribbon != null && TryBuild()) Unhook(); }
         static void Unhook() { ComponentManager.ItemInitialized -= OnInit; AcApp.Idle -= OnIdle; _hooked = false; }
 
-        static bool TryBuild()
+        /// <summary>At most every 2 seconds: if the tab is missing, add it again; if the tab from the menu file and the one built in code are both there, drop the one built in code.</summary>
+        static void OnWatch(object s, EventArgs e)
         {
+            if ((DateTime.UtcNow - _last).TotalSeconds < 2) return; _last = DateTime.UtcNow;
             try
             {
-                var rc = ComponentManager.Ribbon; if (rc == null) return false;
-                foreach (var t in rc.Tabs) if (t.Id == TabId) return true;
+                var rc = ComponentManager.Ribbon; if (rc == null) return;
+                RibbonTab code = null; int n = 0;
+                foreach (var t in rc.Tabs) { if (t.Id == TabId) code = t; if (t.Id == TabId || t.Title == TabTitle) n++; }
+                if (n == 0) { if (TryBuild()) { _readded++; Log.Write("Ribbon tab was missing and was added again (" + _readded + ")."); } }
+                else if (n > 1 && code != null) { rc.Tabs.Remove(code); Log.Write("Ribbon tab from the menu file is present: the tab built in code was removed."); }
+            }
+            catch (Exception ex) { Log.Write("Ribbon watch: " + ex.Message); }
+        }
+        public static bool AddNow() { _last = DateTime.MinValue; try { var rc = ComponentManager.Ribbon; if (rc == null) return false; foreach (var t in rc.Tabs) if (t.Id == TabId || t.Title == TabTitle) return true; return TryBuild(); } catch { return false; } }
+
+        public static void SavePng(int size, string kind, string path)
+        {
+            var enc = new PngBitmapEncoder(); enc.Frames.Add(BitmapFrame.Create(Icon(size, kind))); using (var fs = File.Create(path)) enc.Save(fs);
+        }
+        /// <summary>The button list, shared by the tab built in code and the menu file: panel title, rows, buttons {text, command, icon, tip}.</summary>
+        public static List<KeyValuePair<string, string[][]>> Layout() { MakeTab(); return _layout; }
+        static List<KeyValuePair<string, string[][]>> _layout = new List<KeyValuePair<string, string[][]>>();
+
+        static RibbonTab MakeTab()
+        {
                 var tab = new RibbonTab { Title = "B+ CAD Tools", Id = TabId };
                 AddStackPanel(tab, "Points", 3, L("Import points", "BPIMPORT ", "import", "Import a points file (txt, csv, xlsx) as points with codes and layers"), L("Show / hide", "BPISOLATE ", "layers", "Show or hide point categories"), L("Connect points", "BPCONNECT ", "connect", "Draw lines through points by code and point number"), L("Vertices to points", "BPVERTS ", "verts", "Make a numbered point at every vertex"), L("Convert points", "BPCONVPTS ", "convpts", "Convert AutoCAD points to Civil 3D COGO points and back. Needs Civil 3D"), L("QA / QC", "BPQAQC ", "qa", "Check points: repeated numbers, duplicates, missing code or elevation, spikes"), L("Shift", "BPSHIFT ", "shift", "Move the selection by dE, dN, dZ"), L("Quick profile", "BPPROFILE ", "profile", "Quick longitudinal profile along a line from points or the line's own levels (drawn as plain geometry, not a Civil 3D profile)"), L("Parking", "BPPARKING ", "parking", "Draw parking stalls (parallel, 90 or 45 degrees) along a line, with editable sizes"), L("Quick section", "BPSECTION ", "section", "Cross-sections along a line from points and/or a typical or existing road (lanes, sidewalks). Drawn as plain geometry, not Civil 3D sections"));
                 AddStackPanel(tab, "Coordinates", 3, L("Coordinate system", "BPGMAPCS ", "cs", "Choose the coordinate system of the drawing: search by name, EPSG or country"), L("Convert coordinates", "BPCONVCS ", "convcs", "Convert selected objects or a coordinate file from one coordinate system to another"));
@@ -38,6 +66,16 @@ namespace BPlus.LiveMap
                 AddStackPanel(tab, "Quantities", 3, L("Sinks", "BPSINKS ", "sinks", "Find where water collects on a surface: sinks with E, N, Z, depth, area and volume"), L("Cut and fill", "BPCUTFILL ", "cutfill", "Cut and fill volumes (m3) between the ground and another surface, a level or a plane"), L("Lengths", "BPLENGTHS ", "lengths", "List length and area of selected polylines, with table, CSV and labels"));
                 AddStackPanel(tab, "Output", 3, L("Plot layouts", "BPPLOT ", "plot", "Plot the layouts you tick: each layout's own page setup or your settings, to PDF or a printer"), L("Export points", "BPEXPORT ", "export", "Export points to a clean text or csv file"), L("Coordinates", "BPCOORD ", "coord", "Write E and N at points and vertices"));
                 AddStackPanel(tab, "Settings", 3, L("Settings", "BPSETTINGS ", "sliders", "Options, point defaults, updates"), L("Check updates", "BPUPDATE ", "update", "Check GitHub for a newer version and install it"), L("About", "BPABOUT ", "about", "Version and where settings are kept"), L("Clean drawing", "BPCLEAN ", "clean", "Remove empty layers, unused blocks and styles, zero-length objects (and duplicates if ticked) to make the file smaller. Saves a backup first"));
+                return tab;
+        }
+
+        static bool TryBuild()
+        {
+            try
+            {
+                var rc = ComponentManager.Ribbon; if (rc == null) return false;
+                foreach (var t in rc.Tabs) if (t.Id == TabId || t.Title == TabTitle) return true;
+                var tab = MakeTab();
                 rc.Tabs.Add(tab);
                 Log.Write("Ribbon tab added.");
                 return true;
@@ -64,6 +102,7 @@ namespace BPlus.LiveMap
         }
         static void AddStackPanel(RibbonTab tab, string title, int rows, params string[][] btns)
         {
+            _layout.RemoveAll(k => k.Key == title + "|" + rows); _layout.Add(new KeyValuePair<string, string[][]>(title + "|" + rows, btns));
             var src = new RibbonPanelSource { Title = title }; AddStack(src, rows, btns); tab.Panels.Add(new RibbonPanel { Source = src });
         }
         /// <summary>Live map (large) with Map options and the coordinate system stacked beside it.</summary>

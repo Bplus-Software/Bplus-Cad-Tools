@@ -14,7 +14,7 @@ namespace BPlus.LiveMap
 {
     public class App : IExtensionApplication
     {
-        public static string Version = "0.4.21-experimental";
+        public static string Version = "0.4.22-experimental";
         public void Initialize()
         {
             try
@@ -22,6 +22,7 @@ namespace BPlus.LiveMap
                 Log.Write("Startup. Plugin " + Version + ", runtime " + System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription + ", AutoCAD " + AcApp.Version + ", DLL " + Assembly.GetExecutingAssembly().Location);
                 Engine.Init();
                 Ribbon.Install();
+                CuiSetup.StartupCheck();
                 UpdateCheck.StartupCheck();
                 var ed = AcApp.DocumentManager.MdiActiveDocument?.Editor;
                 if (ed != null) ed.WriteMessage("\nB+ CAD Tools " + Version + " loaded. Use the B+ CAD Tools tab.\n");
