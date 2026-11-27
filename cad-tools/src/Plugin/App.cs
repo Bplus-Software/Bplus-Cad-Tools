@@ -14,7 +14,7 @@ namespace BPlus.LiveMap
 {
     public class App : IExtensionApplication
     {
-        public static string Version = "0.4.18-experimental";
+        public static string Version = "0.4.19-experimental";
         public void Initialize()
         {
             try
@@ -97,6 +97,19 @@ namespace BPlus.LiveMap
                 Engine.ForgetProvider(doc);
                 var p = Engine.EnsureProvider(doc, false);
                 doc.Editor.WriteMessage("\n[BPlus map] Coordinate system: " + (p != null ? p.Description + " (from " + p.Source + ")" : "not set") + "\n");
+            });
+        }
+
+        [CommandMethod("BPLIBDUMP")]
+        public static void LibDump()
+        {
+            Guard("BPLIBDUMP", () =>
+            {
+                var ed = Doc.Editor; var r = ed.GetString(new PromptStringOptions("\nWord to look for in the coordinate library (e.g. GRF17, Saudi, UTM; Enter = everything): ") { AllowSpaces = true });
+                if (r.Status != PromptStatus.OK && r.Status != PromptStatus.None) return;
+                string path = AssignCs.DumpLibrary(r.StringResult);
+                ed.WriteMessage("\n[BPlus map] Library list written to: " + path + "\n");
+                try { System.Diagnostics.Process.Start("explorer.exe", "/select,\"" + path + "\""); } catch { }
             });
         }
 
