@@ -25,13 +25,15 @@ namespace BPlus.LiveMap
 
         /// <summary>Text height in drawing units: 2.5 mm on paper at the drawing scale. At scale 1 that would be unreadably small in a metre drawing, so the Settings text height is used instead.</summary>
         static double ProfileTextHeight(double scale) { return scale > 1.0001 ? 0.0025 * scale : Config.TextHeight; }
+        /// <summary>For a profile: the larger of the scale-based or Settings height and a height that suits the line length (so a long line does not get tiny text).</summary>
+        static double ProfileTextHeight(double scale, double length) { return Math.Max(ProfileTextHeight(scale), ProfileMath.AutoTextHeight(length)); }
 
         static bool ProfileAsk(double length, double scale, double th, bool anyPts, out ProfOpts o)
         {
             o = new ProfOpts { TextH = th, Interval = ProfileMath.DefaultInterval(length) }; var res = o; bool good = false;
             using (var f = Theme.Base("B+ CAD Tools - Quick profile", 520, 560))
             {
-                f.Controls.Add(Theme.Lbl("Line length " + length.ToString("F2", CultureInfo.InvariantCulture) + " m.  Drawing scale 1:" + scale.ToString("0.##", CultureInfo.InvariantCulture) + " (DIMSCALE)" + (scale <= 1.0001 ? ", so text height comes from Settings." : "."), 16, 14, 490, true));
+                f.Controls.Add(Theme.Lbl("Line length " + length.ToString("F2", CultureInfo.InvariantCulture) + " m.  Drawing scale 1:" + scale.ToString("0.##", CultureInfo.InvariantCulture) + " (DIMSCALE)" + ", text height suggested from the line length: change it below if you want.", 16, 14, 490, true));
                 string[] nm = { "Vertical exaggeration", "Station interval (m)", "Offset: points within (m) of the line", "Datum level (m), empty = automatic", "Text height (drawing units)", "Frame height (drawing units), empty = use exaggeration" };
                 string[] vl = { "10", ProfileMath.DefaultInterval(length).ToString(CultureInfo.InvariantCulture), "5", "", th.ToString("0.###", CultureInfo.InvariantCulture), "" };
                 var tb = new TextBox[6];
@@ -82,7 +84,7 @@ namespace BPlus.LiveMap
                         var cv = (Curve)tr.GetObject(er.ObjectId, OpenMode.ForRead); length = cv.GetDistanceAtParameter(cv.EndParam);
                         tr.Commit();
                     }
-                    double scale = DrawingScale(db), th = ProfileTextHeight(scale);
+                    double scale = DrawingScale(db), th = ProfileTextHeight(scale, length);
                     if (!ProfileAsk(length, scale, th, any, out o)) return;
                     using (var tr = db.TransactionManager.StartTransaction())
                     {
@@ -150,14 +152,14 @@ namespace BPlus.LiveMap
                     int rows = Math.Min(m.Table.Count, 201); double rh = th * 2, cw = th * 9, y0 = -th * 6, x0 = 0;
                     for (int r = 0; r <= rows; r++) add(new Line(P(x0, y0 - r * rh), P(x0 + cw * 4, y0 - r * rh)), 8);
                     for (int c = 0; c <= 4; c++) add(new Line(P(x0 + c * cw, y0), P(x0 + c * cw, y0 - rows * rh)), 8);
-                    for (int r = 0; r < rows; r++) for (int c = 0; c < 4; c++) txt(new ProfText { X = x0 + c * cw + th * 0.4, Y = y0 - r * rh - rh / 2, S = m.Table[r][c], Align = 0, Kind = r == 0 ? "title" : "tab" }, th * (r == 0 ? 1.0 : 0.9));
+                    for (int r = 0; r < rows; r++) for (int c = 0; c < 4; c++) txt(new ProfText { X = x0 + c * cw + th * 0.4, Y = y0 - r * rh - rh / 2, S = m.Table[r][c], Align = 0, Kind = r == 0 ? "title" : "tab" }, th * 1.0);
                     double ySum = y0 - rows * rh - th * 3;
                     if (m.Table.Count > rows) ySum -= th * 2;
                     double[] cws = { cw * 1.6, cw, cw, cw * 1.4 }; double tw = cws.Sum();
                     for (int r = 0; r <= m.Summary.Count; r++) add(new Line(P(x0, ySum - r * rh), P(x0 + tw, ySum - r * rh)), 8);
                     double cx = x0; var xs2 = new List<double>(); xs2.Add(cx); foreach (var w in cws) { cx += w; xs2.Add(cx); }
                     foreach (double xx in xs2) add(new Line(P(xx, ySum), P(xx, ySum - m.Summary.Count * rh)), 8);
-                    for (int r = 0; r < m.Summary.Count; r++) for (int c = 0; c < 4; c++) txt(new ProfText { X = xs2[c] + th * 0.4, Y = ySum - r * rh - rh / 2, S = m.Summary[r][c], Align = 0, Kind = r == 0 ? "title" : "tab" }, th * (r == 0 ? 1.0 : 0.9));
+                    for (int r = 0; r < m.Summary.Count; r++) for (int c = 0; c < 4; c++) txt(new ProfText { X = xs2[c] + th * 0.4, Y = ySum - r * rh - rh / 2, S = m.Summary[r][c], Align = 0, Kind = r == 0 ? "title" : "tab" }, th * 1.1);
                     if (m.Table.Count > rows) txt(new ProfText { X = x0, Y = y0 - rows * rh - th * 1.5, S = "Table shows the first " + (rows - 1) + " of " + (m.Table.Count - 1) + " points.", Align = 0, Kind = "tab" }, th);
                 }
                 tr.Commit();

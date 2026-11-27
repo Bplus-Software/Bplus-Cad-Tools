@@ -486,3 +486,4 @@ namespace BPlus.LiveMap.Core.Tests
         }
     }
 }
+namespace BPlus.LiveMap.Core.Tests { public class AutoTextTests { [Xunit.Fact] public void AutoText() { Xunit.Assert.Equal(2, ProfileMath.AutoTextHeight(240), 6); Xunit.Assert.Equal(20, ProfileMath.AutoTextHeight(2400), 6); Xunit.Assert.True(ProfileMath.AutoTextHeight(0) > 0); } } }

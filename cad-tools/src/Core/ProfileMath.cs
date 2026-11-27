@@ -38,6 +38,8 @@ namespace BPlus.LiveMap.Core
         }
 
         static string PtName(ProfPt p, IList<ProfPt> pts) { return p.Id != "" ? "No " + p.Id : "No " + (pts.IndexOf(p) + 1).ToString(CultureInfo.InvariantCulture); }
+        /// <summary>Text height that reads well on a profile of this length: about 1/120 of the length, rounded to 1, 2 or 5 x 10^n.</summary>
+        public static double AutoTextHeight(double length) { return NiceStep(Math.Max(length, 1) / 120.0); }
         public static string F2(double v) { return v.ToString("F2", CultureInfo.InvariantCulture); }
 
         /// <summary>Default station interval for a line of this length (about ten divisions).</summary>
