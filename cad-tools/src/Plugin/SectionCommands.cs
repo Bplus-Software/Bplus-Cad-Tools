@@ -59,7 +59,7 @@ namespace BPlus.LiveMap
         public sealed class Choice
         {
             public bool Whole = true, Ground = true; public int Road; /* 0 none, 1 typical, 2 existing, 3 assembly */ public SecAssembly Asm;
-            public double Interval = 20, Half = 15, Strip = 2.5, Ve = 1, Start, End, TextH, CentreLevel = double.NaN, SwL, SwR, PlL, PlR, Kerb, Cross; public double[] Lanes = new double[0]; public bool Divide, Labels = true; public int Cols = 3;
+            public double Interval = 20, Half = 15, Strip = 2.5, Ve = 1, Start, End, TextH, CentreLevel = double.NaN, SwL, SwR, PlL, PlR, Kerb, Cross; public double[] Lanes = new double[0]; public bool Divide, Labels = true, GroundLine = true; public short GroundCol = 3; public int Cols = 3;
         }
 
         public static bool Ask(double length, bool havePts, double th, out Choice ch)
@@ -93,10 +93,11 @@ namespace BPlus.LiveMap
                 tb[7].Text = ""; tb[8].Text = "20"; tb[9].Text = "15"; tb[10].Text = "2.5"; tb[11].Text = "1"; tb[12].Text = ""; tb[13].Text = ""; tb[14].Text = "3"; tb[15].Text = N(th);
                 int by = 160 + 9 * 32;
                 var div = new CheckBox { Left = 16, Top = by, Width = 560, Text = "Existing road: divide the picked (or start/end) width equally among the lanes typed above", Checked = true, ForeColor = Theme.Text, BackColor = Color.Transparent };
-                var lab = new CheckBox { Left = 16, Top = by + 28, Width = 560, Text = "Label every ground point (number and level)", Checked = true, ForeColor = Theme.Text, BackColor = Color.Transparent };
+                var lab = new CheckBox { Left = 16, Top = by + 28, Width = 290, Text = "Label every ground point (number and level)", Checked = true, ForeColor = Theme.Text, BackColor = Color.Transparent };
+                var glc = new CheckBox { Left = 310, Top = by + 28, Width = 150, Text = "Show ground line, colour", Checked = true, ForeColor = Theme.Text, BackColor = Color.Transparent }; var glb = Commands.GLCombo(466, by + 26, 110); glc.CheckedChanged += (s2, e2) => glb.Enabled = glc.Checked;
                 var note = Theme.Lbl("Whole road with an existing road: type the road width at the start and the end; it is interpolated along the line, centred on the line. One station: you pick the two edges and the centre.", 16, by + 56, 560, true); note.Height = 40;
                 var info = new Label { Left = 16, Top = by + 98, Width = 560, Height = 36, ForeColor = Color.FromArgb(255, 150, 120), BackColor = Color.Transparent };
-                f.Controls.AddRange(new Control[] { div, lab, note, info });
+                f.Controls.AddRange(new Control[] { div, lab, glc, glb, note, info });
                 var edit = Theme.Btn("Edit road presets...", 16, 590, 170); var editA = Theme.Btn("Edit assemblies...", 192, 590, 170); var ok = Theme.Btn("Next", 410, 590, 80, true); var cancel = Theme.Btn("Cancel", 498, 590, 80);
                 edit.Click += (s, e) => { EditPresets(); var np = Presets(); for (int i = 0; i < 3; i++) pre[i] = np[i]; fillFrom(typ.SelectedIndex); };
                 editA.Click += (s, e) => { string keep = asmBox.SelectedItem as string; AsmUi.Edit(keep); asmList = AsmUi.All(); asmBox.Items.Clear(); foreach (var a in asmList) asmBox.Items.Add(a.Name); int ix = asmList.FindIndex(a => a.Name == keep); asmBox.SelectedIndex = ix < 0 ? 0 : ix; };
@@ -112,7 +113,7 @@ namespace BPlus.LiveMap
                     if (!gr.Checked && ro0.Checked) { info.Text = "Choose ground from points, a road, or both."; return; }
                     int cols; if (!int.TryParse(tb[14].Text.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out cols) || cols < 1 || cols > 20) { info.Text = "Sections per row: 1 to 20."; return; }
                     res.Asm = ro3.Checked && asmBox.SelectedIndex >= 0 ? asmList[asmBox.SelectedIndex].Copy() : null; res.Whole = rw.Checked; res.Ground = gr.Checked; res.Road = ro0.Checked ? 0 : ro1.Checked ? 1 : ro3.Checked ? 3 : 2; res.Interval = d[8]; res.Half = d[9]; res.Strip = d[10]; res.Ve = d[11]; res.TextH = d[15]; res.SwL = d[1]; res.SwR = d[2]; res.PlL = d[3]; res.PlR = d[4]; res.Kerb = d[5]; res.Cross = d[6];
-                    res.Lanes = lanes.ToArray(); res.CentreLevel = cl; res.Start = ws; res.End = we; res.Divide = div.Checked; res.Labels = lab.Checked; res.Cols = cols; good = true; f.DialogResult = DialogResult.OK;
+                    res.Lanes = lanes.ToArray(); res.CentreLevel = cl; res.Start = ws; res.End = we; res.Divide = div.Checked; res.Labels = lab.Checked; res.GroundLine = glc.Checked; res.GroundCol = Commands.GLAci[glb.SelectedIndex]; res.Cols = cols; good = true; f.DialogResult = DialogResult.OK;
                 };
                 cancel.Click += (s, e) => f.DialogResult = DialogResult.Cancel;
                 f.Controls.AddRange(new Control[] { edit, editA, ok, cancel }); f.AcceptButton = ok; f.CancelButton = cancel; AcApp.ShowModalDialog(f);
@@ -123,9 +124,11 @@ namespace BPlus.LiveMap
 
     public partial class Commands
     {
+        internal static readonly string[] GLNames = { "Green", "Yellow", "Cyan", "Red", "White", "Grey" }; internal static readonly short[] GLAci = { 3, 2, 4, 1, 7, 8 };
+        internal static ComboBox GLCombo(int left, int top, int width) { var c = new ComboBox { Left = left, Top = top, Width = width, DropDownStyle = ComboBoxStyle.DropDownList, FlatStyle = FlatStyle.Flat }; Theme.Style(c); c.Items.AddRange(GLNames); c.SelectedIndex = 0; return c; }
         static short SecColor(string kind) { switch (kind) { case "frame": return 7; case "grid": return 8; case "centre": return 1; case "road": return 7; case "walk": return 6; case "plant": return 3; case "tree": return 3; case "ped": return 30; case "slope": return 4; case "lane": return 2; case "dim": return 2; case "pt": return 3; default: return 7; } }
 
-        static int DrawSections(Document doc, List<ProfModel> models, List<double> halfs, Point3d at, double th, int cols)
+        static int DrawSections(Document doc, List<ProfModel> models, List<double> halfs, Point3d at, double th, int cols, bool gline = true, short gcol = 3)
         {
             var db = doc.Database; int n = 0;
             double dx = halfs.Max() * 2 + 12 * th, dy = models.Max(m => m.Segs.Max(s => Math.Max(s.Y1, s.Y2))) + 24 * th;
@@ -140,12 +143,12 @@ namespace BPlus.LiveMap
                     var m = models[i]; double ox = at.X + (i % cols) * dx, oy = at.Y - (i / cols) * dy;
                     Func<double, double, Point3d> P = (x, y) => new Point3d(ox + x, oy + y, 0);
                     foreach (var s in m.Segs) add(new Line(P(s.X1, s.Y1), P(s.X2, s.Y2)), SecColor(s.Kind));
-                    if (m.Ground.Count > 1) { var pl = new Autodesk.AutoCAD.DatabaseServices.Polyline(); int k = 0; foreach (var g in m.Ground) pl.AddVertexAt(k++, new Point2d(ox + g[0], oy + g[1]), 0, 0, 0); add(pl, 3); }
+                    if (gline && m.Ground.Count > 1) { var pl = new Autodesk.AutoCAD.DatabaseServices.Polyline(); int k = 0; foreach (var g in m.Ground) pl.AddVertexAt(k++, new Point2d(ox + g[0], oy + g[1]), 0, 0, 0); add(pl, gcol); }
                     foreach (var t in m.Texts)
                     {
                         var d = new DBText { TextString = t.S, Height = t.Kind == "title" ? th * 1.2 : th, Position = P(t.X, t.Y), Rotation = t.Rot * Math.PI / 180.0 };
                         d.HorizontalMode = t.Align == 0 ? TextHorizontalMode.TextLeft : t.Align == 1 ? TextHorizontalMode.TextCenter : TextHorizontalMode.TextRight; d.VerticalMode = TextVerticalMode.TextVerticalMid; d.AlignmentPoint = P(t.X, t.Y);
-                        add(d, SecColor(t.Kind));
+                        add(d, t.Kind == "pt" ? gcol : SecColor(t.Kind));
                     }
                 }
                 tr.Commit();
@@ -232,7 +235,7 @@ namespace BPlus.LiveMap
                 }
                 if (models.Count == 0) { ed.WriteMessage("\n[B+] Nothing to draw. " + string.Join("; ", notes) + "\n"); return; }
                 var ip = ed.GetPoint("\nPick the insertion point (top left of the first section): "); if (ip.Status != PromptStatus.OK) return;
-                int made = DrawSections(doc, models, halfs, ip.Value, ch.TextH, ch.Cols);
+                int made = DrawSections(doc, models, halfs, ip.Value, ch.TextH, ch.Cols, ch.GroundLine, ch.GroundCol);
                 ed.WriteMessage("\n[B+] " + models.Count + " section(s) drawn on layer B+_SECTION (" + made + " objects)" + (skipped > 0 ? ", " + skipped + " station(s) skipped for lack of points" : "") + ". Left of the line is negative. It is a drawing: it does not update if points move. It does not check the widths against any standard." + (notes.Count > 0 ? "\n[B+] Notes: " + string.Join("; ", notes.Take(12)) + (notes.Count > 12 ? "; and " + (notes.Count - 12) + " more" : "") : "") + "\n");
             });
         }

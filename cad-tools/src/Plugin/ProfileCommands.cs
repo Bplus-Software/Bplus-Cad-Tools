@@ -18,7 +18,7 @@ namespace BPlus.LiveMap
 {
     public partial class Commands
     {
-        sealed class ProfOpts { public double Interval, Ve = 10, Offset = 5, Datum = double.NaN, TextH; public bool Label = true, Table = true, OwnZ, Grid = true, Drops = true, Mark = true, Avg = true; public double Height = double.NaN; }
+        sealed class ProfOpts { public double Interval, Ve = 10, Offset = 5, Datum = double.NaN, TextH; public bool Label = true, Table = true, OwnZ, Grid = true, Drops = true, Mark = true, Avg = true, GLine = true; public short GCol = 3; public double Height = double.NaN; }
 
         /// <summary>Drawing scale: DIMSCALE of this drawing (the scale the surrounding drawing is annotated at). 0 or less counts as 1.</summary>
         static double DrawingScale(Database db) { double s = 1; try { s = Convert.ToDouble(Autodesk.AutoCAD.ApplicationServices.Application.GetSystemVariable("DIMSCALE"), CultureInfo.InvariantCulture); } catch { } return s > 0 ? s : 1; }
@@ -31,7 +31,7 @@ namespace BPlus.LiveMap
         static bool ProfileAsk(double length, double scale, double th, bool anyPts, out ProfOpts o)
         {
             o = new ProfOpts { TextH = th, Interval = ProfileMath.DefaultInterval(length) }; var res = o; bool good = false;
-            using (var f = Theme.Base("B+ CAD Tools - Quick profile", 520, 560))
+            using (var f = Theme.Base("B+ CAD Tools - Quick profile", 520, 620))
             {
                 f.Controls.Add(Theme.Lbl("Line length " + length.ToString("F2", CultureInfo.InvariantCulture) + " m.  Drawing scale 1:" + scale.ToString("0.##", CultureInfo.InvariantCulture) + " (DIMSCALE)" + ", text height suggested from the line length: change it below if you want.", 16, 14, 490, true));
                 string[] nm = { "Vertical exaggeration", "Station interval (m)", "Offset: points within (m) of the line", "Datum level (m), empty = automatic", "Text height (drawing units)", "Frame height (drawing units), empty = use exaggeration" };
@@ -42,10 +42,10 @@ namespace BPlus.LiveMap
                 var lab = new CheckBox { Left = 16, Top = 290, Width = 480, Text = "Label every point (number and level)", Checked = true, ForeColor = Theme.Text, BackColor = Color.Transparent };
                 var tab = new CheckBox { Left = 16, Top = 318, Width = 480, Text = "Add a table below with a summary (average, highest, lowest, height difference)", Checked = true, ForeColor = Theme.Text, BackColor = Color.Transparent };
                 Func<string, int, bool, CheckBox> cb = (t, y, c) => new CheckBox { Left = 16, Top = y, Width = 480, Text = t, Checked = c, ForeColor = Theme.Text, BackColor = Color.Transparent };
-                var grid = cb("Show grid lines", 346, true); var drops = cb("Show a line from every point down to the datum", 374, true); var mark = cb("Mark the highest and lowest point on the profile", 402, true); var avgl = cb("Draw the average level as a line", 430, true);
-                f.Controls.AddRange(new Control[] { own, lab, tab, grid, drops, mark, avgl });
-                var info = new Label { Left = 16, Top = 462, Width = 490, Height = 36, ForeColor = Color.FromArgb(255, 150, 120), BackColor = Color.Transparent }; f.Controls.Add(info);
-                var ok = Theme.Btn("Next", 300, 510, 100, true); var cancel = Theme.Btn("Cancel", 410, 510, 90);
+                var grid = cb("Show grid lines", 346, true); var drops = cb("Show a line from every point down to the datum", 374, true); var mark = cb("Mark the highest and lowest point on the profile", 402, true); var avgl = cb("Draw the average level as a line", 430, true); var glc = cb("Show the ground line, colour:", 458, true); glc.Width = 260; var glb = GLCombo(290, 456, 110); glc.CheckedChanged += (s2, e2) => glb.Enabled = glc.Checked;
+                f.Controls.AddRange(new Control[] { own, lab, tab, grid, drops, mark, avgl, glc, glb });
+                var info = new Label { Left = 16, Top = 492, Width = 490, Height = 36, ForeColor = Color.FromArgb(255, 150, 120), BackColor = Color.Transparent }; f.Controls.Add(info);
+                var ok = Theme.Btn("Next", 300, 540, 100, true); var cancel = Theme.Btn("Cancel", 410, 540, 90);
                 ok.Click += (s, e) =>
                 {
                     double ve, iv, off, th2, dat = double.NaN;
@@ -56,7 +56,7 @@ namespace BPlus.LiveMap
                     if (!Theme.TryNum(tb[4].Text, out th2) || th2 <= 0 || th2 > 50) { info.Text = "Text height must be above 0 and at most 50."; return; }
                     double hh = double.NaN; if (tb[5].Text.Trim().Length > 0 && (!Theme.TryNum(tb[5].Text, out hh) || hh <= 0)) { info.Text = "Frame height must be a number above 0, or empty."; return; }
                     if (length / iv > 400) { info.Text = "That gives more than 400 station marks. Use a bigger interval."; return; }
-                    res.Ve = ve; res.Interval = iv; res.Offset = off; res.Datum = dat; res.TextH = th2; res.OwnZ = own.Checked; res.Label = lab.Checked; res.Table = tab.Checked; res.Height = hh; res.Grid = grid.Checked; res.Drops = drops.Checked; res.Mark = mark.Checked; res.Avg = avgl.Checked; good = true; f.DialogResult = DialogResult.OK;
+                    res.Ve = ve; res.Interval = iv; res.Offset = off; res.Datum = dat; res.TextH = th2; res.OwnZ = own.Checked; res.Label = lab.Checked; res.Table = tab.Checked; res.Height = hh; res.Grid = grid.Checked; res.Drops = drops.Checked; res.Mark = mark.Checked; res.Avg = avgl.Checked; res.GLine = glc.Checked; res.GCol = GLAci[glb.SelectedIndex]; good = true; f.DialogResult = DialogResult.OK;
                 };
                 cancel.Click += (s, e) => f.DialogResult = DialogResult.Cancel;
                 f.Controls.Add(ok); f.Controls.Add(cancel); f.AcceptButton = ok; f.CancelButton = cancel; AcApp.ShowModalDialog(f);
@@ -120,13 +120,13 @@ namespace BPlus.LiveMap
                 if (raw.Count == 1) { ed.WriteMessage("\n[B+] Only one point found; a profile needs at least two.\n"); return; }
                 var ip = ed.GetPoint("\nPick the insertion point of the profile (its datum line starts here): "); if (ip.Status != PromptStatus.OK) return;
                 var model0 = raw; var model = ProfileMath.Build(raw, o.Ve, o.Interval, o.TextH, o.Datum, o.Label, o.Table, new ProfStyle { Height = o.Height, Grid = o.Grid, Drops = o.Drops, MarkExtremes = o.Mark, AvgLine = o.Avg });
-                int made = DrawProfile(doc, model, ip.Value, o.TextH);
+                int made = DrawProfile(doc, model, ip.Value, o.TextH, o.GLine, o.GCol);
                 if (model.Summary.Count > 4) ed.WriteMessage("\n[B+] Average level " + model.Summary[1][2] + " m (of the points). Highest " + model.Summary[2][2] + " m at " + model.Summary[2][1] + ". Lowest " + model.Summary[3][2] + " m at " + model.Summary[3][1] + " (" + model.Summary[3][3] + ").\n");
                 ed.WriteMessage("\n[B+] Profile drawn on layer B+_PROFILE: " + raw.Count + " points, line length " + length.ToString("F2", CultureInfo.InvariantCulture) + " m, datum " + model.Datum.ToString("F2", CultureInfo.InvariantCulture) + " m, exaggeration x" + o.Ve.ToString("0.##", CultureInfo.InvariantCulture) + ", " + made + " objects. It is a drawing: it does not update if the points move.\n");
             });
         }
 
-        static int DrawProfile(Document doc, ProfModel m, Point3d at, double th)
+        static int DrawProfile(Document doc, ProfModel m, Point3d at, double th, bool gline = true, short gcol = 3)
         {
             var db = doc.Database; int n = 0;
             using (doc.LockDocument())
@@ -139,12 +139,12 @@ namespace BPlus.LiveMap
                 foreach (var s in m.Segs) add(new Line(P(s.X1, s.Y1), P(s.X2, s.Y2)), s.Kind == "frame" ? (short)7 : s.Kind == "grid" ? (short)8 : s.Kind == "avg" ? (short)4 : s.Kind == "mark" ? (short)1 : (short)9);
                 var pl = new Autodesk.AutoCAD.DatabaseServices.Polyline(); int i = 0;
                 foreach (var g in m.Ground) pl.AddVertexAt(i++, new Point2d(at.X + g[0], at.Y + g[1]), 0, 0, 0);
-                pl.ConstantWidth = 0; add(pl, 3);
+                pl.ConstantWidth = 0; if (gline) add(pl, gcol);
                 Action<ProfText, double> txt = (t, h) =>
                 {
                     var d = new DBText { TextString = t.S, Height = h, Position = P(t.X, t.Y), Rotation = t.Rot * Math.PI / 180.0 };
                     d.HorizontalMode = t.Align == 0 ? TextHorizontalMode.TextLeft : t.Align == 1 ? TextHorizontalMode.TextCenter : TextHorizontalMode.TextRight; d.VerticalMode = TextVerticalMode.TextVerticalMid;
-                    d.AlignmentPoint = P(t.X, t.Y); add(d, t.Kind == "pt" ? (short)3 : t.Kind == "avg" ? (short)4 : t.Kind == "mark" ? (short)1 : (short)7);
+                    d.AlignmentPoint = P(t.X, t.Y); add(d, t.Kind == "pt" ? gcol : t.Kind == "avg" ? (short)4 : t.Kind == "mark" ? (short)1 : (short)7);
                 };
                 foreach (var t in m.Texts) txt(t, t.Kind == "title" ? th * 1.2 : th);
                 if (m.Table.Count > 0)
