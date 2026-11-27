@@ -14,7 +14,9 @@ namespace BPlus.LiveMap
 {
     public partial class Commands
     {
-        const int CivilMaxCells = 600000, MaxDelaunayPoints = 8000;
+        const int CivilMaxCells = 120000, MaxDelaunayPoints = 8000;
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")] static extern short GetAsyncKeyState(int vk);
 
         static Grid CivilGrid(Transaction tr, ObjectId id, double cell, Editor ed, out double used, out string err)
         {
@@ -26,9 +28,18 @@ namespace BPlus.LiveMap
             used = cell;
             var g = new Grid { X0 = minx, Y0 = miny, Cell = cell, NX = (int)Math.Ceiling((maxx - minx) / cell) + 1, NY = (int)Math.Ceiling((maxy - miny) / cell) + 1 }; g.Z = new double[g.NX * g.NY];
             ed.WriteMessage("\n[B+] Sampling the surface: " + g.NX + " x " + g.NY + " cells of " + cell.ToString("0.###", CultureInfo.InvariantCulture) + " m. This can take a while...\n");
-            int ok = 0; var args = new object[2];
+            int ok = 0, tried = 0, bad = 0; var args = new object[2]; var clock = System.Diagnostics.Stopwatch.StartNew(); long lastMsg = 0;
             for (int j = 0; j < g.NY; j++) for (int i = 0; i < g.NX; i++)
                 {
+                    // Stay responsive: Esc cancels, 90 seconds is the limit, progress is printed every 5 seconds, and a surface that fails nearly everywhere stops early.
+                    if ((++tried & 255) == 0)
+                    {
+                        System.Windows.Forms.Application.DoEvents();
+                        if ((GetAsyncKeyState(0x1B) & 0x8000) != 0) { err = "Cancelled (Esc)."; return null; }
+                        if (clock.ElapsedMilliseconds > 90000) { err = "Stopped after 90 seconds: reading this surface is too slow. Use a larger grid cell."; return null; }
+                        if (clock.ElapsedMilliseconds - lastMsg > 5000) { lastMsg = clock.ElapsedMilliseconds; ed.WriteMessage("\n[B+] Sampling... " + (100L * tried / ((long)g.NX * g.NY)) + "% (Esc cancels)\n"); }
+                        if (tried >= 5000 && ok * 20 < tried) { err = "The surface gave an elevation at fewer than 5% of the sampled places. Check the surface or use a larger grid cell."; return null; }
+                    }
                     double z = double.NaN;
                     try { args[0] = g.CX(i); args[1] = g.CY(j); z = Convert.ToDouble(m.Invoke(o, args)); ok++; } catch { }
                     g.Z[j * g.NX + i] = z;
@@ -88,15 +99,31 @@ namespace BPlus.LiveMap
                 ed.WriteMessage("\n[B+] Sinks: " + sinks.Count + " found, " + ignored + " ignored as too small or shallow.\n");
                 if (sinks.Count == 0) { System.Windows.Forms.MessageBox.Show("No sinks found with these limits (" + ignored + " smaller ones ignored).", "B+ CAD Tools"); return; }
                 if (!SinksUi.Result(sinks, ignored, note)) return;
-                int pn = 0, ln = 0, on = 0; double th = Config.TextHeight;
+                int pn = 0, ln = 0, on = 0, lown = 0, arn = 0; double th = Config.TextHeight;
                 using (doc.LockDocument())
                 using (var tr = doc.Database.TransactionManager.StartTransaction())
                 {
                     var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(doc.Database), OpenMode.ForWrite);
-                    var lay = SurveyCad.EnsureLayer(tr, doc.Database, "BP-SINK", 5); var layO = SurveyCad.EnsureLayer(tr, doc.Database, "BP-SINK-OUT", 4);
+                    var layLow = ch.Low ? SurveyCad.EnsureLayer(tr, doc.Database, "BP-SINK-LOW", 1) : ObjectId.Null; var layDir = ch.Dir ? SurveyCad.EnsureLayer(tr, doc.Database, "BP-SINK-DIR", 3) : ObjectId.Null; var lay = SurveyCad.EnsureLayer(tr, doc.Database, "BP-SINK", 5); var layO = SurveyCad.EnsureLayer(tr, doc.Database, "BP-SINK-OUT", 4);
                     foreach (var s in sinks)
                     {
                         var at = new Point3d(s.E, s.N, s.LowZ);
+                        if (ch.Low)
+                        {
+                            double r = Math.Max(th, Math.Min(th * 2, Math.Sqrt(s.Area) / 6));
+                            foreach (var seg in new[] { new[] { -r, 0, r, 0 }, new[] { 0, -r, 0, r } }) { var ln2 = new Line(new Point3d(at.X + seg[0], at.Y + seg[1], at.Z), new Point3d(at.X + seg[2], at.Y + seg[3], at.Z)); ln2.SetDatabaseDefaults(doc.Database); ln2.LayerId = layLow; ms.AppendEntity(ln2); tr.AddNewlyCreatedDBObject(ln2, true); }
+                            var zt = new DBText(); zt.SetDatabaseDefaults(doc.Database); zt.TextString = "Z " + s.LowZ.ToString("F3", CultureInfo.InvariantCulture); zt.Height = th; zt.Position = new Point3d(at.X + r * 1.3, at.Y - th * 0.5, at.Z); zt.LayerId = layLow; ms.AppendEntity(zt); tr.AddNewlyCreatedDBObject(zt, true); lown++;
+                        }
+                        if (ch.Dir)
+                            foreach (var ar in s.Arrows(g, ch.Spacing))
+                            {
+                                double sp2 = ch.Spacing > 0 ? ch.Spacing : Math.Max(g.Cell, Math.Sqrt(s.Area) / 6), len = Math.Max(th * 1.5, sp2 * 0.6), hd = len * 0.25, a = ar[2];
+                                double x0 = ar[0] - Math.Cos(a) * len / 2, y0 = ar[1] - Math.Sin(a) * len / 2, x1 = ar[0] + Math.Cos(a) * len / 2, y1 = ar[1] + Math.Sin(a) * len / 2;
+                                var pl2 = new AcPoly(); pl2.SetDatabaseDefaults(doc.Database); int vi = 0;
+                                pl2.AddVertexAt(vi++, new Point2d(x0, y0), 0, 0, 0); pl2.AddVertexAt(vi++, new Point2d(x1, y1), 0, 0, 0);
+                                pl2.AddVertexAt(vi++, new Point2d(x1 - Math.Cos(a - 0.5) * hd, y1 - Math.Sin(a - 0.5) * hd), 0, 0, 0); pl2.AddVertexAt(vi++, new Point2d(x1, y1), 0, 0, 0); pl2.AddVertexAt(vi++, new Point2d(x1 - Math.Cos(a + 0.5) * hd, y1 - Math.Sin(a + 0.5) * hd), 0, 0, 0);
+                                pl2.Elevation = s.LowZ; pl2.LayerId = layDir; ms.AppendEntity(pl2); tr.AddNewlyCreatedDBObject(pl2, true); arn++;
+                            }
                         if (ch.Point) { var dp = new DBPoint(at) { LayerId = lay }; ms.AppendEntity(dp); tr.AddNewlyCreatedDBObject(dp, true); pn++; }
                         if (ch.Leader)
                         {
@@ -116,7 +143,7 @@ namespace BPlus.LiveMap
                     }
                     tr.Commit();
                 }
-                ed.WriteMessage("\n[B+] Marked " + sinks.Count + " sinks: " + pn + " point(s) on BP-SINK, " + ln + " leader(s), " + on + " outline(s) on BP-SINK-OUT. One UNDO removes them. Outlines are cell-size staircases.\n");
+                ed.WriteMessage("\n[B+] Low points: " + lown + ", slope arrows: " + arn + ".\n[B+] Marked " + sinks.Count + " sinks: " + pn + " point(s) on BP-SINK, " + ln + " leader(s), " + on + " outline(s) on BP-SINK-OUT. One UNDO removes them. Outlines are cell-size staircases.\n");
             });
         }
     }

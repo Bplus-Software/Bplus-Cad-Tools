@@ -39,11 +39,15 @@ namespace BPlus.LiveMap
                 f.FormBorderStyle = FormBorderStyle.Sizable; f.MaximizeBox = true; f.MinimumSize = new Size(560, 420);
                 var wa = Screen.FromControl(f).WorkingArea; f.StartPosition = FormStartPosition.Manual;
                 var bar = new Panel { Dock = DockStyle.Bottom, Height = 56, BackColor = Theme.Bar };
-                var body = new Panel { Dock = DockStyle.Fill, AutoScroll = true, BackColor = Theme.Bar };
+                var body = new Panel { Dock = DockStyle.Fill, AutoScroll = false, BackColor = Theme.Bar };
                 f.Controls.Add(body); f.Controls.Add(bar); bar.BringToFront(); body.BringToFront();
 
                 // Card 1: layouts
-                int n = Math.Min(Math.Max(rows.Count, 1), 8), listH = n * 28 + 4;
+                f.Font = new System.Drawing.Font("Segoe UI", 10f);
+                // Only the layout list scrolls. Its height is what is left on the screen after the other cards, the button bar and the title bar.
+                float sc0 = 1f; try { using (var g0 = f.CreateGraphics()) sc0 = g0.DpiY / 96f; } catch { }
+                int availDesign = (int)((wa.Height - 20 - 45 * sc0) / sc0) - bar.Height - 16, full = Math.Max(rows.Count, 1) * 34 + 6;
+                int listH = Math.Max(3 * 34 + 6, Math.Min(full, availDesign - 562));
                 var c1 = Card(body, 14, 30 + listH + 30, "LAYOUTS");
                 var all = new Label { Text = "All", Left = 540, Top = 10, Width = 40, Height = 18, ForeColor = Theme.Accent, BackColor = Color.Transparent, Cursor = Cursors.Hand };
                 var none = new Label { Text = "None", Left = 590, Top = 10, Width = 60, Height = 18, ForeColor = Theme.Accent, BackColor = Color.Transparent, Cursor = Cursors.Hand };
@@ -52,8 +56,8 @@ namespace BPlus.LiveMap
                 for (int k = 0; k < rows.Count; k++)
                 {
                     var r = rows[k];
-                    var cb = new CheckBox { Text = r.Name, Left = 10, Top = 4 + k * 28, Width = 400, Height = 24, Checked = true, ForeColor = Theme.Text, BackColor = Color.Transparent };
-                    var info = new Label { Text = (string.IsNullOrEmpty(r.Paper) ? "" : r.Paper) + (string.IsNullOrEmpty(r.Scale) ? "" : "   " + r.Scale), Left = 416, Top = 4 + k * 28, Width = 200, Height = 24, TextAlign = ContentAlignment.MiddleRight, ForeColor = Theme.Dim, BackColor = Color.Transparent };
+                    var cb = new CheckBox { Text = r.Name, Left = 10, Top = 4 + k * 34, Width = 420, Height = 28, Checked = true, ForeColor = Theme.Text, BackColor = Color.Transparent };
+                    var info = new Label { Text = (string.IsNullOrEmpty(r.Paper) ? "" : r.Paper) + (string.IsNullOrEmpty(r.Scale) ? "" : "   " + r.Scale), Left = 416, Top = 4 + k * 34, Width = 210, Height = 28, TextAlign = ContentAlignment.MiddleRight, ForeColor = Theme.Dim, BackColor = Color.Transparent };
                     list.Controls.Add(cb); list.Controls.Add(info); checks.Add(cb);
                 }
                 var cnt = Small(c1, "", 16, 32 + listH + 6, 636);
@@ -138,19 +142,12 @@ namespace BPlus.LiveMap
                     var ticked = new List<string>(); for (int k = 0; k < checks.Count; k++) if (checks[k].Checked) ticked.Add(rows[k].Name);
                     if (ticked.Count == 0) { MessageBox.Show(f, "Tick at least one layout.", "B+ CAD Tools"); return; }
                     if (string.IsNullOrWhiteSpace(fold.Text) && pdf.Checked) { MessageBox.Show(f, "Choose a folder for the PDF files.", "B+ CAD Tools"); return; }
-                    if (my.Checked) { if (dev.Text.Length == 0) { MessageBox.Show(f, "No printer or PDF device is available for this choice.", "B+ CAD Tools"); return; } if (PlotNaming.ParseScale(sc.Text) < 0) { MessageBox.Show(f, "Scale: type Fit or something like 1:500.", "B+ CAD Tools"); return; } }
+                    if (my.Checked) { if (med.SelectedIndex < 0 || med.SelectedIndex >= media.Count) { MessageBox.Show(f, "Choose a paper size for this printer first.", "B+ CAD Tools"); return; } if (dev.Text.Length == 0) { MessageBox.Show(f, "No printer or PDF device is available for this choice.", "B+ CAD Tools"); return; } if (PlotNaming.ParseScale(sc.Text) < 0) { MessageBox.Show(f, "Scale: type Fit or something like 1:500.", "B+ CAD Tools"); return; } }
                     res = new PlotChoice { OwnSetup = own.Checked, Pdf = pdf.Checked, Combined = one.Checked, Lineweights = lw.Checked, Device = dev.Text, MediaCanonical = med.SelectedIndex >= 0 && med.SelectedIndex < media.Count ? media[med.SelectedIndex][0] : null, Scale = sc.Text, Style = sty.SelectedIndex > 0 ? sty.Text : "", Folder = fold.Text.Trim(), Pattern = pat.Text, Rotation = rot.SelectedIndex, Layouts = ticked };
                     f.DialogResult = DialogResult.OK;
                 };
                 cancel.Click += (s, e) => f.DialogResult = DialogResult.Cancel; f.AcceptButton = ok; f.CancelButton = cancel;
-                // After the form is scaled for the screen's DPI, grow it to show all content (measured, not guessed), capped to the working area.
-                f.Load += (s, e) =>
-                {
-                    int bottom = 0, right = 0; foreach (Control c in body.Controls) { bottom = Math.Max(bottom, c.Bottom); right = Math.Max(right, c.Right); }
-                    int extraW = f.Width - f.ClientSize.Width, extraH = f.Height - f.ClientSize.Height;
-                    int w = Math.Min(right + 30 + extraW, wa.Width - 20), h = Math.Min(bottom + 16 + bar.Height + extraH, wa.Height - 20);
-                    f.Size = new Size(w, h); f.Location = new Point(wa.Left + (wa.Width - w) / 2, wa.Top + (wa.Height - h) / 2); place();
-                };
+                Theme.Fit(f, body, bar, wa, 716, c3.Bottom); f.Load += (s, e) => place();
                 return AcApp.ShowModalDialog(f) == DialogResult.OK ? res : null;
             }
         }

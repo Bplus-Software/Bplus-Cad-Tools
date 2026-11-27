@@ -143,4 +143,14 @@ public class GoogleParseTests
         Assert.Equal(1, c); Assert.Equal(1, s); var l = o.Split('\n'); Assert.StartsWith("No,E,N,Z,Code", l[0]); Assert.StartsWith("1,46.67", l[1]); Assert.EndsWith(",612.5,TP", l[1].TrimEnd('\r'));
         int e, n; CoordConvert.GuessColumns("1,669459.622,2734271.672,612.5,TP", out e, out n); Assert.Equal(2, e); Assert.Equal(3, n);
     }
+
+    [Fact] public void SinkArrowsPointDownhillToTheCentre()
+    {
+        var g = new Grid { X0 = 0, Y0 = 0, Cell = 1, NX = 11, NY = 11 }; g.Z = new double[121];
+        for (int j = 0; j < 11; j++) for (int i = 0; i < 11; i++) g.Z[j * 11 + i] = 5 + Math.Max(Math.Abs(i - 5), Math.Abs(j - 5)) * 0.5;
+        int ign; var s = Sinks.Analyze(g, 0.0, 0.0, out ign); Assert.True(s.Count >= 0);
+        var sk = new Sink(); for (int k = 0; k < 121; k++) sk.Cells.Add(k);
+        var ar = sk.Arrows(g, 2); Assert.NotEmpty(ar);
+        foreach (var a in ar) { double dx = 5 - a[0], dy = 5 - a[1]; if (Math.Abs(dx) < 1e-9 && Math.Abs(dy) < 1e-9) continue; Assert.True(Math.Cos(a[2]) * dx + Math.Sin(a[2]) * dy > -1e-9); }
+    }
 }

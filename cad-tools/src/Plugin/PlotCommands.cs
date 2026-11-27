@@ -52,15 +52,16 @@ namespace BPlus.LiveMap
         [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);
         [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool PostMessage(IntPtr h, uint m, IntPtr w, IntPtr l);
         delegate bool EnumProc(IntPtr h, IntPtr l);
-        static volatile bool _run; static System.Threading.Thread _t;
+        static volatile bool _run; static System.Threading.Thread _t; static long _t0;
+        public static void Reset() { System.Threading.Interlocked.Exchange(ref _t0, DateTime.UtcNow.Ticks); }
         public static void Start(int seconds)
         {
-            Stop(); _run = true; uint me = (uint)System.Diagnostics.Process.GetCurrentProcess().Id; var t0 = DateTime.UtcNow;
+            Stop(); _run = true; uint me = (uint)System.Diagnostics.Process.GetCurrentProcess().Id; Reset();
             _t = new System.Threading.Thread(() =>
             {
                 while (_run)
                 {
-                    System.Threading.Thread.Sleep(700); double age = (DateTime.UtcNow - t0).TotalSeconds; bool kill = age > seconds;
+                    System.Threading.Thread.Sleep(700); double age = (DateTime.UtcNow - new DateTime(System.Threading.Interlocked.Read(ref _t0), DateTimeKind.Utc)).TotalSeconds; bool kill = age > seconds;
                     try
                     {
                         EnumWindows((h, l) =>
@@ -115,16 +116,29 @@ namespace BPlus.LiveMap
                 ps.CopyFrom(lo);
                 if (custom)
                 {
-                    psv.SetPlotConfigurationName(ps, ch.Device, ch.MediaCanonical); psv.RefreshLists(ps);
-                    psv.SetPlotPaperUnits(ps, PlotPaperUnit.Millimeters); psv.SetPlotType(ps, Autodesk.AutoCAD.DatabaseServices.PlotType.Layout);
-                    psv.SetPlotRotation(ps, ch.Rotation == 0 ? PlotRotation.Degrees000 : PlotRotation.Degrees090);
+                    // Each step is separate: a step the printer refuses is skipped and logged, only device and paper are essential, and an error names the step.
+                    Action<string, Action, bool> step = (nm, act, must) => { try { act(); } catch (System.Exception ex) { Log.Write("BPPLOT step '" + nm + "' failed for " + lo.LayoutName + ": " + ex.Message); if (must) throw new System.Exception("step '" + nm + "': " + ex.Message); } };
+                    step("printer", () => { psv.SetPlotConfigurationName(ps, ch.Device, null); psv.RefreshLists(ps); }, true);
+                    step("paper size", () =>
+                    {
+                        try { psv.SetCanonicalMediaName(ps, ch.MediaCanonical); }
+                        catch
+                        {
+                            var names = psv.GetCanonicalMediaNameList(ps); string pick = null; foreach (string n in names) if (n.IndexOf("A4", StringComparison.OrdinalIgnoreCase) >= 0 && n.IndexOf("Extended", StringComparison.OrdinalIgnoreCase) < 0) { pick = n; break; }
+                            if (pick == null && names.Count > 0) pick = names[0]; if (pick == null) throw; psv.SetCanonicalMediaName(ps, pick); Log.Write("BPPLOT: paper '" + ch.MediaCanonical + "' not accepted by " + ch.Device + ", used " + pick);
+                        }
+                    }, true);
+                    step("units", () => psv.SetPlotPaperUnits(ps, PlotPaperUnit.Millimeters), false);
+                    step("plot area", () => psv.SetPlotType(ps, Autodesk.AutoCAD.DatabaseServices.PlotType.Layout), false);
+                    step("rotation", () => psv.SetPlotRotation(ps, ch.Rotation == 0 ? PlotRotation.Degrees000 : PlotRotation.Degrees090), false);
                     double ratio = PlotNaming.ParseScale(ch.Scale);
-                    // A paper space layout is already laid out at paper size: "Fit" means 1:1 on the sheet. (Scale-to-fit on a Layout plot shrinks or stretches the sheet and cut the page edges.)
-                    psv.SetPlotCentered(ps, false); psv.SetPlotOrigin(ps, new Autodesk.AutoCAD.Geometry.Point2d(0, 0));
-                    if (ratio == 0) { psv.SetUseStandardScale(ps, true); psv.SetStdScaleType(ps, StdScaleType.StdScale1To1); }
-                    else { psv.SetUseStandardScale(ps, false); psv.SetCustomPrintScale(ps, new CustomScale(1.0, PlotNaming.DrawingUnitsPerPaperMm(ratio, unit))); }
-                    if (!string.IsNullOrEmpty(ch.Style)) psv.SetCurrentStyleSheet(ps, ch.Style);
-                    ps.PrintLineweights = ch.Lineweights;
+                    // A paper space layout is already laid out at paper size: "Fit" means 1:1 on the sheet.
+                    step("centre", () => psv.SetPlotCentered(ps, false), false);
+                    step("origin", () => psv.SetPlotOrigin(ps, new Autodesk.AutoCAD.Geometry.Point2d(0, 0)), false);
+                    if (ratio == 0) step("scale", () => { psv.SetUseStandardScale(ps, true); psv.SetStdScaleType(ps, StdScaleType.StdScale1To1); }, false);
+                    else step("scale", () => { psv.SetUseStandardScale(ps, false); psv.SetCustomPrintScale(ps, new CustomScale(1.0, PlotNaming.DrawingUnitsPerPaperMm(ratio, unit))); }, true);
+                    if (!string.IsNullOrEmpty(ch.Style)) step("plot style", () => psv.SetCurrentStyleSheet(ps, ch.Style), false);
+                    step("line weights", () => ps.PrintLineweights = ch.Lineweights, false);
                     how = hasDevice || !ch.OwnSetup ? "my settings" : "my settings (the layout has no printer set)";
                 }
                 else
@@ -133,7 +147,7 @@ namespace BPlus.LiveMap
                     if (ch.Pdf && lo.PlotConfigurationName.IndexOf("pdf", StringComparison.OrdinalIgnoreCase) < 0) { psv.SetPlotConfigurationName(ps, string.IsNullOrEmpty(ch.Device) ? PdfDevice : ch.Device, lo.CanonicalMediaName); psv.RefreshLists(ps); how += " on the PDF driver"; }
                 }
                 pi.OverrideSettings = ps;
-                var piv = new PlotInfoValidator { MediaMatchingPolicy = MatchingPolicy.MatchEnabled }; piv.Validate(pi);
+                try { var piv = new PlotInfoValidator { MediaMatchingPolicy = MatchingPolicy.MatchEnabled }; piv.Validate(pi); } catch (System.Exception ex) { Log.Write("BPPLOT validate failed for " + lo.LayoutName + ": " + ex.Message + ", retrying with MatchDisabled"); var piv2 = new PlotInfoValidator { MediaMatchingPolicy = MatchingPolicy.MatchDisabled }; try { piv2.Validate(pi); } catch (System.Exception ex2) { throw new System.Exception("validate (" + ch.Device + ", paper " + ch.MediaCanonical + "): " + ex2.Message); } }
             }
             return pi;
         }
@@ -143,7 +157,7 @@ namespace BPlus.LiveMap
         {
             try
             {
-                int seen = 0;
+                int seen = 0; var sw = System.Diagnostics.Stopwatch.StartNew();
                 using (var tr = db.TransactionManager.StartOpenCloseTransaction())
                 {
                     var bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
@@ -153,7 +167,7 @@ namespace BPlus.LiveMap
                         if (btr.IsFromExternalReference || btr.IsDependent) continue;
                         foreach (ObjectId eid in btr)
                         {
-                            if (++seen > 300000) return false;
+                            if (++seen > 100000 || ((seen & 1023) == 0 && sw.ElapsedMilliseconds > 2000)) { Log.Write("Arabic scan: stopped early after " + seen + " objects"); return false; }
                             string txt = null; var cls = eid.ObjectClass.DxfName;
                             if (cls == "TEXT" || cls == "MTEXT" || cls == "ATTDEF" || cls == "INSERT" || cls == "ATTRIB")
                             {
@@ -169,6 +183,8 @@ namespace BPlus.LiveMap
             catch (System.Exception ex) { Log.Write("Arabic scan: " + ex.Message); }
             return false;
         }
+
+        static bool EscPressed() { try { return (GetAsyncKeyState(0x1B) & 0x8000) != 0; } catch { return false; } }
 
         [CommandMethod("BPPLOT")]
         public static void PlotLayouts()
@@ -204,7 +220,7 @@ namespace BPlus.LiveMap
                 if (ms) MsPdfWatch.Start(120);
                 if (ch.Pdf) { try { Directory.CreateDirectory(ch.Folder); } catch (System.Exception ex) { ed.WriteMessage("\n[B+] Cannot use that folder: " + ex.Message + "\n"); return; } }
 
-                var done = new List<string>(); var failed = new List<string>(); object oldBg = null; string oldLayout = null;
+                string phase = ""; var done = new List<string>(); var failed = new List<string>(); object oldBg = null; string oldLayout = null;
                 try { oldBg = AcApp.GetSystemVariable("BACKGROUNDPLOT"); AcApp.SetSystemVariable("BACKGROUNDPLOT", 0); } catch { }
                 try { oldLayout = LayoutManager.Current.CurrentLayout; } catch { }
                 try
@@ -241,6 +257,8 @@ namespace BPlus.LiveMap
                                         pe.BeginDocument(pis[0].Value, doc.Name, null, 1, true, path);
                                         for (int i = 0; i < pis.Count; i++)
                                         {
+                                            if (EscPressed()) { failed.Add("Stopped with Esc before " + pis[i].Key); break; }
+                                            ed.WriteMessage("\n[B+] Plotting " + (i + 1) + " of " + pis.Count + ": " + pis[i].Key);
                                             try { LayoutManager.Current.CurrentLayout = pis[i].Key; } catch { }
                                             var pp = new PlotPageInfo(); pe.BeginPage(pp, pis[i].Value, i == pis.Count - 1, null); pe.BeginGenerateGraphics(null); pe.EndGenerateGraphics(null); pe.EndPage(null);
                                         }
@@ -252,13 +270,16 @@ namespace BPlus.LiveMap
                                         {
                                             try
                                             {
+                                                if (EscPressed()) { failed.Add("Stopped with Esc before " + kv.Key); break; }
+                                                ed.WriteMessage("\n[B+] Plotting " + kv.Key);
                                                 try { LayoutManager.Current.CurrentLayout = kv.Key; } catch { }
+                                                if (ms) MsPdfWatch.Reset();
                                                 string path = ch.Pdf ? PlotNaming.Unique(ch.Folder, PlotNaming.FileName(ch.Pattern, drawing, kv.Key), ".pdf", File.Exists) : "";
-                                                pe.BeginDocument(kv.Value, doc.Name, null, 1, ch.Pdf, path);
-                                                var pp = new PlotPageInfo(); pe.BeginPage(pp, kv.Value, true, null); pe.BeginGenerateGraphics(null); pe.EndGenerateGraphics(null); pe.EndPage(null); pe.EndDocument(null);
+                                                phase = "BeginDocument"; pe.BeginDocument(kv.Value, doc.Name, null, 1, ch.Pdf, path);
+                                                var pp = new PlotPageInfo(); phase = "BeginPage"; pe.BeginPage(pp, kv.Value, true, null); phase = "BeginGenerateGraphics"; pe.BeginGenerateGraphics(null); phase = "EndGenerateGraphics"; pe.EndGenerateGraphics(null); phase = "EndPage"; pe.EndPage(null); phase = "EndDocument"; pe.EndDocument(null);
                                                 done.Add(ch.Pdf ? path : kv.Key + " (printer)");
                                             }
-                                            catch (System.Exception ex) { failed.Add(kv.Key + ": " + ex.Message); try { pe.EndDocument(null); } catch { } }
+                                            catch (System.Exception ex) { Log.Write("BPPLOT plot step " + phase + " failed for " + kv.Key + ": " + ex.Message); failed.Add(kv.Key + ": at " + phase + " (" + ch.Device + ", " + ch.MediaCanonical + "): " + ex.Message); try { pe.EndDocument(null); } catch { } }
                                         }
                                     }
                                     pe.EndPlot(null);

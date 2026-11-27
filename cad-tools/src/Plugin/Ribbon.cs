@@ -57,7 +57,7 @@ namespace BPlus.LiveMap
             for (int r = 0; r < rows; r++)
             {
                 bool any = false;
-                for (int i = r; i < btns.Length; i += rows) { var sb = Small(btns[i]); int mx = 0; for (int j = i - r; j < Math.Min(btns.Length, i - r + rows); j++) mx = Math.Max(mx, btns[j][0].Replace("\n", " ").Length); sb.Width = Math.Max(70, mx * 6.6 + 34); rp.Items.Add(sb); any = true; }
+                for (int i = r; i < btns.Length; i += rows) { var sb = Small(btns[i]); int mx = 0; for (int j = i - r; j < Math.Min(btns.Length, i - r + rows); j++) mx = Math.Max(mx, btns[j][0].Replace("\n", " ").Length); sb.Width = Math.Max(84, mx * 6.9 + 44); rp.Items.Add(sb); any = true; }
                 if (any && r < rows - 1 && r + 1 < btns.Length) rp.Items.Add(new RibbonRowBreak());
             }
             src.Items.Add(rp);

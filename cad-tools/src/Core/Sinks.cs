@@ -14,7 +14,25 @@ namespace BPlus.LiveMap.Core
 
     public sealed class Sink
     {
-        public int No; public double E, N, LowZ, SpillZ, Depth, Area, Volume; public List<List<double[]>> Outline = new List<List<double[]>>();
+        public int No; public double E, N, LowZ, SpillZ, Depth, Area, Volume; public List<List<double[]>> Outline = new List<List<double[]>>(); public List<int> Cells = new List<int>();
+        /// <summary>Downhill arrows inside the sink: (x, y, direction in radians). spacing 0 = about 6 across.</summary>
+        public List<double[]> Arrows(Grid g, double spacing)
+        {
+            var res = new List<double[]>(); if (Cells.Count == 0) return res; int nx = g.NX, ny = g.NY; var set = new HashSet<int>(Cells);
+            int minI = int.MaxValue, maxI = int.MinValue, minJ = int.MaxValue, maxJ = int.MinValue; foreach (var k in Cells) { int i = k % nx, j = k / nx; minI = Math.Min(minI, i); maxI = Math.Max(maxI, i); minJ = Math.Min(minJ, j); maxJ = Math.Max(maxJ, j); }
+            int step = spacing > 0 ? Math.Max(1, (int)Math.Round(spacing / g.Cell)) : Math.Max(1, (Math.Max(maxI - minI, maxJ - minJ) + 1) / 6);
+            for (int j = minJ; j <= maxJ; j += step) for (int i = minI; i <= maxI; i += step)
+                {
+                    int k = j * nx + i; if (!set.Contains(k)) continue; double z = g.Z[k], best = 0, ang = double.NaN;
+                    for (int dj = -1; dj <= 1; dj++) for (int di = -1; di <= 1; di++)
+                        {
+                            if (di == 0 && dj == 0) continue; int ii = i + di, jj = j + dj; if (ii < 0 || jj < 0 || ii >= nx || jj >= ny) continue; double zz = g.Z[jj * nx + ii]; if (double.IsNaN(zz)) continue;
+                            double drop = (z - zz) / (Math.Sqrt(di * di + dj * dj) * g.Cell); if (drop > best + 1e-12) { best = drop; ang = Math.Atan2(dj, di); }
+                        }
+                    if (!double.IsNaN(ang)) res.Add(new[] { g.CX(i), g.CY(j), ang });
+                }
+            return res;
+        }
     }
 
     public static class Sinks
@@ -115,7 +133,7 @@ namespace BPlus.LiveMap.Core
                 int low = cells[0]; double vol = 0; foreach (var k in cells) { if (zs[k] < zs[low]) low = k; vol += (fill[k] - zs[k]) * cell2; }
                 double depth = lvl - zs[low], area = cells.Count * cell2;
                 if (depth < minDepth || area < minArea) { ignored++; continue; }
-                var sk = new Sink { E = g.CX(low % nx), N = g.CY(low / nx), LowZ = zs[low], SpillZ = lvl, Depth = depth, Area = area, Volume = vol };
+                var sk = new Sink { Cells = cells, E = g.CX(low % nx), N = g.CY(low / nx), LowZ = zs[low], SpillZ = lvl, Depth = depth, Area = area, Volume = vol };
                 sk.Outline = Outline(cells, g); list.Add(sk);
             }
             list = list.OrderByDescending(x => x.Depth).ToList(); for (int i = 0; i < list.Count; i++) list[i].No = i + 1;

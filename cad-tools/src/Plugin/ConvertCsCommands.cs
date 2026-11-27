@@ -104,13 +104,7 @@ namespace BPlus.LiveMap
                     action = ActConvert; f.DialogResult = DialogResult.OK;
                 };
                 cancel.Click += (s, e) => f.DialogResult = DialogResult.Cancel; f.CancelButton = cancel;
-                f.Load += (s, e) =>
-                {
-                    int bottom = 0, right = 0; foreach (Control c in body.Controls) { bottom = Math.Max(bottom, c.Bottom); right = Math.Max(right, c.Right); }
-                    int extraW = f.Width - f.ClientSize.Width, extraH = f.Height - f.ClientSize.Height;
-                    int w = Math.Min(right + 30 + extraW, wa.Width - 20), h = Math.Min(bottom + 16 + bar.Height + extraH, wa.Height - 20);
-                    f.Size = new Size(w, h); f.Location = new Point(wa.Left + (wa.Width - w) / 2, wa.Top + (wa.Height - h) / 2); place();
-                };
+                Theme.Fit(f, body, bar, wa, 716, c3.Bottom); f.Load += (s3, e3) => place();
                 var r = AcApp.ShowModalDialog(f);
                 st.FileMode = rFile.Checked; st.ECol = (int)colE.Value; st.NCol = (int)colN.Value; st.Copy = rCopy.Checked;
                 return r == DialogResult.OK || r == DialogResult.Retry ? action : 0;

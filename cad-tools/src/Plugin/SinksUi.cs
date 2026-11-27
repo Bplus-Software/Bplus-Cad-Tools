@@ -8,7 +8,7 @@ using BPlus.LiveMap.Core;
 
 namespace BPlus.LiveMap
 {
-    sealed class SinkChoice { public int Source; public double MinDepth = 0.05, MinArea = 10, Cell = 1; public bool Point = true, Leader = true, Outline = true; }
+    sealed class SinkChoice { public int Source; public double MinDepth = 0.05, MinArea = 10, Cell = 1; public bool Point = true, Leader = true, Outline = true, Low = true, Dir = true; public double Spacing; }
 
     static class SinksUi
     {
@@ -16,7 +16,7 @@ namespace BPlus.LiveMap
 
         public static SinkChoice Ask()
         {
-            using (var f = Theme.Base("B+ CAD Tools - Water collection points (sinks)", 520, 560))
+            using (var f = Theme.Base("B+ CAD Tools - Water collection points (sinks)", 520, 660))
             {
                 f.Controls.Add(Theme.Lbl("Find sinks over the whole surface of", 16, 12, 480));
                 var r = new[] { new RadioButton { Text = "A Civil 3D surface  (pick it)", Checked = true }, new RadioButton { Text = "Selected points, 3D faces and 3D polylines" }, new RadioButton { Text = "All points, 3D faces and 3D polylines in the drawing" } };
@@ -30,16 +30,23 @@ namespace BPlus.LiveMap
                 var k2 = new CheckBox { Text = "A leader:  S1  E, N, Z  depth", Left = 20, Top = 308, Width = 460, Checked = true, ForeColor = Theme.Text, BackColor = Color.Transparent };
                 var k3 = new CheckBox { Text = "The outline of the pond (closed polyline at the spill level)", Left = 20, Top = 334, Width = 470, Checked = true, ForeColor = Theme.Text, BackColor = Color.Transparent };
                 f.Controls.AddRange(new Control[] { k1, k2, k3 });
-                f.Controls.Add(Theme.Lbl("Next you pick the surface (or select objects). You see the list of sinks before anything is drawn.", 16, 380, 490, true));
-                f.Controls.Add(Theme.Lbl("A sink is a place where water cannot run out: the grid is filled from the edges and the filled parts are the sinks.", 16, 412, 490, true));
-                var ok = Theme.Btn("Next", 312, 516, 100, true); var cancel = Theme.Btn("Cancel", 420, 516, 84);
+                f.Controls.Add(Theme.Lbl("New", 16, 370, 300));
+                var k4 = new CheckBox { Text = "Low point: a cross and the level (Z) at the lowest place of each sink", Left = 20, Top = 396, Width = 480, Checked = true, ForeColor = Theme.Text, BackColor = Color.Transparent };
+                var k5 = new CheckBox { Text = "Slope direction: arrows inside each sink pointing downhill", Left = 20, Top = 422, Width = 480, Checked = true, ForeColor = Theme.Text, BackColor = Color.Transparent };
+                f.Controls.AddRange(new Control[] { k4, k5 });
+                f.Controls.Add(Theme.Lbl("Arrow spacing (m), auto = about 6 across", 44, 452, 250, true)); var sp = new TextBox { Left = 300, Top = 450, Width = 70, Text = "auto", BorderStyle = BorderStyle.FixedSingle }; Theme.Style(sp); f.Controls.Add(sp);
+                f.Controls.Add(Theme.Lbl("Layers: BP-SINK-LOW and BP-SINK-DIR.", 44, 476, 440, true));
+                f.Controls.Add(Theme.Lbl("Next you pick the surface (or select objects). You see the list of sinks before anything is drawn.", 16, 512, 490, true));
+                f.Controls.Add(Theme.Lbl("A sink is a place where water cannot run out: the grid is filled from the edges and the filled parts are the sinks.", 16, 544, 490, true));
+                var ok = Theme.Btn("Next", 312, 616, 100, true); var cancel = Theme.Btn("Cancel", 420, 616, 84);
                 SinkChoice res = null;
                 ok.Click += (s, e) =>
                 {
                     double v1, v2, v3; Func<string, double> p = t => double.TryParse(t.Trim().Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out v3) ? v3 : -1;
                     v1 = p(d.Text); v2 = p(a.Text); v3 = p(c.Text);
+                    double v4 = 0; if (sp.Text.Trim().ToLowerInvariant() != "auto" && sp.Text.Trim().Length > 0) { v4 = p(sp.Text); if (v4 <= 0) { MessageBox.Show(f, "Arrow spacing must be a number above 0, or auto.", "B+ CAD Tools"); return; } }
                     if (v1 < 0 || v2 < 0 || v3 <= 0) { MessageBox.Show(f, "Depth and area must be numbers (0 or more), the grid cell above 0.", "B+ CAD Tools"); return; }
-                    res = new SinkChoice { Source = r[0].Checked ? 0 : r[1].Checked ? 1 : 2, MinDepth = v1, MinArea = v2, Cell = v3, Point = k1.Checked, Leader = k2.Checked, Outline = k3.Checked }; f.DialogResult = DialogResult.OK;
+                    res = new SinkChoice { Source = r[0].Checked ? 0 : r[1].Checked ? 1 : 2, MinDepth = v1, MinArea = v2, Cell = v3, Point = k1.Checked, Leader = k2.Checked, Outline = k3.Checked, Low = k4.Checked, Dir = k5.Checked, Spacing = v4 }; f.DialogResult = DialogResult.OK;
                 };
                 cancel.Click += (s, e) => f.DialogResult = DialogResult.Cancel;
                 f.Controls.AddRange(new Control[] { ok, cancel }); f.AcceptButton = ok; f.CancelButton = cancel;

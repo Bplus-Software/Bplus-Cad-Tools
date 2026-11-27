@@ -55,12 +55,7 @@ namespace BPlus.LiveMap
                 Action place = () => { close.Left = bar.ClientSize.Width - close.Width - 20; ok.Left = close.Left - ok.Width - 10; again.Left = ok.Left - again.Width - 10; }; bar.Resize += (s2, e) => place();
                 Action grab = () => { s.DoLayers = cbs[0].Checked; s.DoBlocks = cbs[1].Checked; s.DoStyles = cbs[2].Checked; s.DoOthers = cbs[3].Checked; s.DoZero = cbs[4].Checked; s.DoDup = cbs[5].Checked; s.DoAudit = au.Checked; s.Backup = bk.Checked; s.SaveAfter = sv.Checked; };
                 ok.Click += (s2, e) => { grab(); action = 1; f.DialogResult = DialogResult.OK; }; again.Click += (s2, e) => { grab(); action = 3; f.DialogResult = DialogResult.Retry; }; close.Click += (s2, e) => f.DialogResult = DialogResult.Cancel; f.CancelButton = close;
-                f.Load += (s2, e) =>
-                {
-                    int bottom = 0, right = 0; foreach (Control c in body.Controls) { bottom = Math.Max(bottom, c.Bottom); right = Math.Max(right, c.Right); }
-                    int xw = f.Width - f.ClientSize.Width, xh = f.Height - f.ClientSize.Height; int w = Math.Min(right + 30 + xw, wa.Width - 20), h = Math.Min(bottom + 16 + bar.Height + xh, wa.Height - 20);
-                    f.Size = new Size(w, h); f.Location = new Point(wa.Left + (wa.Width - w) / 2, wa.Top + (wa.Height - h) / 2); place();
-                };
+                Theme.Fit(f, body, bar, wa, 716, c3.Bottom); f.Load += (s3, e3) => place();
                 var r = AcApp.ShowModalDialog(f); return r == DialogResult.Cancel ? 0 : action;
             }
         }

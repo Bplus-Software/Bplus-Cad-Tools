@@ -36,6 +36,20 @@ namespace BPlus.LiveMap
             DarkTitle(f);
             return f;
         }
+        /// <summary>Sizes a dialog from its design numbers (taken before scaling) times the real screen scale, twice (Load and Shown), capped to the working area. Content never depends on measuring scaled controls.</summary>
+        public static void Fit(Form f, Panel body, Panel bar, Rectangle wa, int designW, int designBottom)
+        {
+            Action go = () =>
+            {
+                float sc = 1f; try { using (var g = f.CreateGraphics()) sc = g.DpiY / 96f; } catch { }
+                int cw = (int)Math.Ceiling(designW * sc), ch = (int)Math.Ceiling((designBottom + 16) * sc) + bar.Height;
+                int extraW = f.Width - f.ClientSize.Width, extraH = f.Height - f.ClientSize.Height;
+                int w = Math.Min(cw + extraW, wa.Width - 20), h = Math.Min(ch + extraH, wa.Height - 20);
+                f.Size = new Size(w, h); f.Location = new Point(wa.Left + (wa.Width - w) / 2, wa.Top + (wa.Height - h) / 2);
+                if (body.AutoScroll) body.AutoScrollMinSize = new Size(0, (int)Math.Ceiling((designBottom + 16) * sc));
+            };
+            f.Load += (s, e) => go(); f.Shown += (s, e) => go();
+        }
         public static Label Lbl(string t, int x, int y, int w = 360, bool dim = false) { return new Label { Text = t, Left = x, Top = y, Width = w, AutoSize = false, Height = 20, ForeColor = dim ? Dim : Text, BackColor = Color.Transparent }; }
         public static Button Btn(string t, int x, int y, int w, bool primary = false)
         {
