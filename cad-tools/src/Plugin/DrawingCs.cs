@@ -65,6 +65,8 @@ namespace BPlus.LiveMap
         /// <summary>Returns a provider, or null when the drawing has no usable coordinate system (the picker is then shown).</summary>
         public static CsProvider Get(Database db)
         {
+            // A system the user picked in the B+ tool always wins over older geographic data in the drawing.
+            var chosen = PickedFor(db); if (chosen != null) return chosen;
             try
             {
                 var gid = db.GeoDataObject;

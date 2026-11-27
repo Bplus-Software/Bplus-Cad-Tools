@@ -12,7 +12,7 @@ namespace BPlus.LiveMap.Setup
         static string LogPath { get { string d = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "BPlus", "LiveMap"); Directory.CreateDirectory(d); return Path.Combine(d, "install-log.txt"); } }
         static void Log(string m) { try { File.AppendAllText(LogPath, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "  " + m + Environment.NewLine); } catch { } }
 
-        const string Version = "0.4.17";
+        const string Version = "0.4.18";
 
         sealed class WaitForm : Form
         {

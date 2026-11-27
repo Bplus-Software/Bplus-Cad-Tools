@@ -14,7 +14,7 @@ namespace BPlus.LiveMap
 {
     public class App : IExtensionApplication
     {
-        public static string Version = "0.4.17-experimental";
+        public static string Version = "0.4.18-experimental";
         public void Initialize()
         {
             try
@@ -91,8 +91,9 @@ namespace BPlus.LiveMap
         {
             Guard("BPGMAPCS", () =>
             {
-                var doc = Doc; int epsg = CsPicker.Ask(); if (epsg <= 0) return;
+                var doc = Doc; int prevPick = DrawingCs.LoadEpsg(doc.Database); int epsg = CsPicker.Ask(); if (epsg <= 0) return;
                 using (doc.LockDocument()) DrawingCs.SaveEpsg(doc.Database, epsg);
+                try { var cs = CoordSys.FromEpsg(epsg); if (cs != null) { int o = AssignCs.Offer(doc, cs, prevPick); doc.Editor.WriteMessage(o == 3 ? "\n[BPlus map] Set as the drawing's coordinate system and the objects were moved. UNDO should reverse it.\n" : o == 2 ? "\n[BPlus map] Also set as the drawing's coordinate system. No object was moved.\n" : "\n[BPlus map] Used in B+ tools only. The drawing's own setting was not changed.\n"); } } catch (System.Exception ex) { Log.Write("AssignCs offer: " + ex.Message); }
                 Engine.ForgetProvider(doc);
                 var p = Engine.EnsureProvider(doc, false);
                 doc.Editor.WriteMessage("\n[BPlus map] Coordinate system: " + (p != null ? p.Description + " (from " + p.Source + ")" : "not set") + "\n");

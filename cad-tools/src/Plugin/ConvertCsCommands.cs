@@ -209,6 +209,37 @@ namespace BPlus.LiveMap
             });
         }
 
+        static bool Movable(Entity en) { return !(en is Hatch) && (en is DBPoint || en is Line || en is Polyline || en is Polyline3d || en is Circle || en is DBText || en is MText || en is BlockReference); }
+
+        /// <summary>Counts model space objects this tool can move and the others by type name (they would stay where they are).</summary>
+        public static void ScanModel(Document doc, out int movable, out Dictionary<string, int> others)
+        {
+            movable = 0; others = new Dictionary<string, int>(); var db = doc.Database;
+            using (var tr = db.TransactionManager.StartOpenCloseTransaction())
+            {
+                var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForRead);
+                foreach (ObjectId id in ms) { var en = tr.GetObject(id, OpenMode.ForRead) as Entity; if (en == null) continue; if (Movable(en)) movable++; else { string k = id.ObjectClass.DxfName; int v; others.TryGetValue(k, out v); others[k] = v + 1; } }
+            }
+        }
+
+        /// <summary>Moves every movable model space object from system a to system b, in place (one transaction, one UNDO). Returns the number moved.</summary>
+        public static int MoveAllModel(Document doc, CoordSys a, CoordSys b)
+        {
+            var db = doc.Database; double unit = DrawingCs.UnitToMetre(db); a.UnitToMetre = unit; b.UnitToMetre = unit; int done = 0;
+            using (doc.LockDocument())
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForRead);
+                foreach (ObjectId id in ms)
+                {
+                    var en = tr.GetObject(id, OpenMode.ForRead) as Entity; if (en == null || !Movable(en)) continue;
+                    en.UpgradeOpen(); if (ConvertEntity(en, a, b, Matrix3d.Identity) > 0) done++;
+                }
+                tr.Commit();
+            }
+            return done;
+        }
+
         static void Describe(Document doc, ConvState st)
         {
             var kinds = new SortedDictionary<string, int>(); double sx = double.NaN, sy = double.NaN;
