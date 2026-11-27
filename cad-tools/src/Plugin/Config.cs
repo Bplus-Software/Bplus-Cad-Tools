@@ -24,7 +24,7 @@ namespace BPlus.LiveMap
         public static string LastUpdateCheck { get { return F.Get("lastUpdateCheck", ""); } set { F.Set("lastUpdateCheck", value ?? ""); F.Save(); } }
         public static string PointOrder { get { string o = F.Get("pointOrder", "PENZD"); return PointText.ValidOrder(o) ? o.ToUpperInvariant() : "PENZD"; } set { F.Set("pointOrder", value); F.Save(); } }
         public static int Decimals { get { int v = F.GetInt("decimals", 3); return v < 0 ? 0 : v > 8 ? 8 : v; } set { F.Set("decimals", value); F.Save(); } }
-        public static double TextHeight { get { double v; return double.TryParse(F.Get("textHeight", "1"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out v) && v > 0 ? v : 1; } set { F.Set("textHeight", value.ToString(System.Globalization.CultureInfo.InvariantCulture)); F.Save(); } }
+        public static double TextHeight { get { double v; return double.TryParse(F.Get("textHeight", "1"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out v) && v > 0 && v <= 50 ? v : 1; } set { F.Set("textHeight", value.ToString(System.Globalization.CultureInfo.InvariantCulture)); F.Save(); } }
         public static bool Enabled { get { return F.GetInt("enabled", 0) == 1; } set { F.Set("enabled", value ? 1 : 0); F.Save(); } }
     }
 }

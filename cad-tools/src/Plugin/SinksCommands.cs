@@ -114,16 +114,6 @@ namespace BPlus.LiveMap
                             foreach (var seg in new[] { new[] { -r, 0, r, 0 }, new[] { 0, -r, 0, r } }) { var ln2 = new Line(new Point3d(at.X + seg[0], at.Y + seg[1], at.Z), new Point3d(at.X + seg[2], at.Y + seg[3], at.Z)); ln2.SetDatabaseDefaults(doc.Database); ln2.LayerId = layLow; ms.AppendEntity(ln2); tr.AddNewlyCreatedDBObject(ln2, true); }
                             var zt = new DBText(); zt.SetDatabaseDefaults(doc.Database); zt.TextString = "Z " + s.LowZ.ToString("F3", CultureInfo.InvariantCulture); zt.Height = th; zt.Position = new Point3d(at.X + r * 1.3, at.Y - th * 0.5, at.Z); zt.LayerId = layLow; ms.AppendEntity(zt); tr.AddNewlyCreatedDBObject(zt, true); lown++;
                         }
-                        if (ch.Dir)
-                            foreach (var ar in s.Arrows(g, ch.Spacing))
-                            {
-                                double sp2 = ch.Spacing > 0 ? ch.Spacing : Math.Max(g.Cell, Math.Sqrt(s.Area) / 6), len = Math.Max(th * 1.5, sp2 * 0.6), hd = len * 0.25, a = ar[2];
-                                double x0 = ar[0] - Math.Cos(a) * len / 2, y0 = ar[1] - Math.Sin(a) * len / 2, x1 = ar[0] + Math.Cos(a) * len / 2, y1 = ar[1] + Math.Sin(a) * len / 2;
-                                var pl2 = new AcPoly(); pl2.SetDatabaseDefaults(doc.Database); int vi = 0;
-                                pl2.AddVertexAt(vi++, new Point2d(x0, y0), 0, 0, 0); pl2.AddVertexAt(vi++, new Point2d(x1, y1), 0, 0, 0);
-                                pl2.AddVertexAt(vi++, new Point2d(x1 - Math.Cos(a - 0.5) * hd, y1 - Math.Sin(a - 0.5) * hd), 0, 0, 0); pl2.AddVertexAt(vi++, new Point2d(x1, y1), 0, 0, 0); pl2.AddVertexAt(vi++, new Point2d(x1 - Math.Cos(a + 0.5) * hd, y1 - Math.Sin(a + 0.5) * hd), 0, 0, 0);
-                                pl2.Elevation = s.LowZ; pl2.LayerId = layDir; ms.AppendEntity(pl2); tr.AddNewlyCreatedDBObject(pl2, true); arn++;
-                            }
                         if (ch.Point) { var dp = new DBPoint(at) { LayerId = lay }; ms.AppendEntity(dp); tr.AddNewlyCreatedDBObject(dp, true); pn++; }
                         if (ch.Leader)
                         {
@@ -140,6 +130,19 @@ namespace BPlus.LiveMap
                                 for (int i = 0; i < loop.Count; i++) pl.AddVertexAt(i, new Point2d(loop[i][0], loop[i][1]), 0, 0, 0);
                                 pl.Closed = true; pl.Elevation = s.SpillZ; pl.LayerId = layO; ms.AppendEntity(pl); tr.AddNewlyCreatedDBObject(pl, true); on++;
                             }
+                    }
+                    if (ch.Dir)
+                    {
+                        var fa = FlowMap.Arrows(g, sinks, ch.Spacing); double sp2 = ch.Spacing > 0 ? ch.Spacing : Math.Max(g.Cell, Math.Max(g.NX, g.NY) / 40 * g.Cell);
+                        foreach (var ar in fa)
+                        {
+                            double len = Math.Max(th * 1.5, sp2 * 0.6), hd = len * 0.25, a = ar[2];
+                            double x0 = ar[0] - Math.Cos(a) * len / 2, y0 = ar[1] - Math.Sin(a) * len / 2, x1 = ar[0] + Math.Cos(a) * len / 2, y1 = ar[1] + Math.Sin(a) * len / 2;
+                            var pl2 = new AcPoly(); pl2.SetDatabaseDefaults(doc.Database); int vi = 0;
+                            pl2.AddVertexAt(vi++, new Point2d(x0, y0), 0, 0, 0); pl2.AddVertexAt(vi++, new Point2d(x1, y1), 0, 0, 0);
+                            pl2.AddVertexAt(vi++, new Point2d(x1 - Math.Cos(a - 0.5) * hd, y1 - Math.Sin(a - 0.5) * hd), 0, 0, 0); pl2.AddVertexAt(vi++, new Point2d(x1, y1), 0, 0, 0); pl2.AddVertexAt(vi++, new Point2d(x1 - Math.Cos(a + 0.5) * hd, y1 - Math.Sin(a + 0.5) * hd), 0, 0, 0);
+                            pl2.Elevation = ar[3]; pl2.LayerId = layDir; ms.AppendEntity(pl2); tr.AddNewlyCreatedDBObject(pl2, true); arn++;
+                        }
                     }
                     tr.Commit();
                 }

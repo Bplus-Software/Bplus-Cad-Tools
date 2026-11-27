@@ -145,7 +145,7 @@ namespace BPlus.LiveMap
                 logb.Click += (s, e) => { try { Process.Start(new ProcessStartInfo(Paths.Dir) { UseShellExecute = true }); } catch { } };
                 ok.Click += (s, e) =>
                 {
-                    double h; if (!double.TryParse(th.Text.Trim(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out h) || h <= 0) { MessageBox.Show(f, "Text height must be a number above zero.", "B+ CAD Tools"); return; }
+                    double h; if (!Theme.TryNum(th.Text, out h) || h <= 0 || h > 50) { MessageBox.Show(f, "Text height must be a number above zero and not more than 50 (drawing units, normally metres). A very big value makes every label and point text huge.", "B+ CAD Tools"); return; }
                     Config.AutoUpdate = auto.Checked; Config.PointOrder = (string)ord.SelectedItem; Config.Decimals = (int)dec.Value; Config.TextHeight = h; f.DialogResult = DialogResult.OK;
                 };
                 cancel.Click += (s, e) => f.DialogResult = DialogResult.Cancel;

@@ -149,6 +149,27 @@ namespace BPlus.LiveMap
             });
         }
 
+        /// <summary>When both points lie on the same line, polyline, arc or spline: the length along it between them. Null if none.</summary>
+        static double? AlongCurve(Document doc, Point3d a, Point3d b)
+        {
+            try
+            {
+                double view = Convert.ToDouble(AcApp.GetSystemVariable("VIEWSIZE")), tol = Math.Max(view / 150, 1e-6);
+                var sel = doc.Editor.SelectCrossingWindow(new Point3d(a.X - tol, a.Y - tol, 0), new Point3d(a.X + tol, a.Y + tol, 0));
+                if (sel.Status != PromptStatus.OK) return null;
+                using (var tr = doc.Database.TransactionManager.StartOpenCloseTransaction())
+                    foreach (var id in sel.Value.GetObjectIds())
+                    {
+                        var c = tr.GetObject(id, OpenMode.ForRead) as Curve; if (c == null || c is Ray || c is Xline) continue;
+                        var pa = c.GetClosestPointTo(a, true); var pb = c.GetClosestPointTo(b, true);
+                        if (pa.DistanceTo(new Point3d(a.X, a.Y, pa.Z)) > tol * 1.5 || pb.DistanceTo(new Point3d(b.X, b.Y, pb.Z)) > tol * 1.5) continue;
+                        return Math.Abs(c.GetDistAtPoint(pb) - c.GetDistAtPoint(pa));
+                    }
+            }
+            catch (System.Exception ex) { Log.Write("BPDIST along: " + ex.Message); }
+            return null;
+        }
+
         [CommandMethod("BPDIST")]
         public static void Dist()
         {
@@ -161,7 +182,16 @@ namespace BPlus.LiveMap
                     var o = new PromptPointOptions("\nSecond point: ") { UseBasePoint = true, BasePoint = a.Value, UseDashedLine = true };
                     var b = ed.GetPoint(o); if (b.Status != PromptStatus.OK) return;
                     double h = Geo2D.Distance(a.Value.X, a.Value.Y, b.Value.X, b.Value.Y), dz = b.Value.Z - a.Value.Z, az = Geo2D.Azimuth(a.Value.X, a.Value.Y, b.Value.X, b.Value.Y);
-                    ed.WriteMessage("\nHorizontal " + F2(h) + "   Slope " + F2(Math.Sqrt(h * h + dz * dz)) + "   dZ " + F2(dz) + "\nAzimuth " + Geo2D.Dms(az) + "   Bearing " + Geo2D.QuadrantBearing(az) + "\n");
+                    double sl = Math.Sqrt(h * h + dz * dz), de = b.Value.X - a.Value.X, dn = b.Value.Y - a.Value.Y, grade = h > 1e-9 ? dz / h * 100 : 0;
+                    ed.WriteMessage("\n[B+] Horizontal " + F2(h) + " m   Slope " + F2(sl) + " m   dZ " + F2(dz) + " m   Azimuth " + Geo2D.Dms(az) + "   Bearing " + Geo2D.QuadrantBearing(az) + "\n");
+                    var rows = new List<string[]> {
+                        new[] { "Horizontal distance", M3(h) + " m" }, new[] { "Slope distance (with Z)", M3(sl) + " m" }, new[] { "Height difference (dZ)", M3(dz) + " m" }, new[] { "Grade", dz == 0 ? "0 %" : grade.ToString("0.###", CultureInfo.InvariantCulture) + " %" },
+                        new[] { "Azimuth", Geo2D.Dms(az) }, new[] { "Bearing", Geo2D.QuadrantBearing(az) }, new[] { "dE   dN", M3(de) + "   " + M3(dn) },
+                        new[] { "From  E N Z", M3(a.Value.X) + "  " + M3(a.Value.Y) + "  " + M3(a.Value.Z) }, new[] { "To  E N Z", M3(b.Value.X) + "  " + M3(b.Value.Y) + "  " + M3(b.Value.Z) } };
+                    var pa = a.Value; var pb = b.Value; var doc2 = Doc; var alo = AlongCurve(doc2, pa, pb);
+                    if (alo.HasValue) rows.Insert(1, new[] { "Along the line", M3(alo.Value) + " m" });
+                    if (MeasureUi.Show("Distance", rows, "Writing in the drawing adds a line and the horizontal distance on layer BP-MEASURE. Close, then pick the next pair (Enter ends)."))
+                        WriteMeasure(doc2, (tr, ms, lay) => { var ln = new Line(pa, pb); ln.SetDatabaseDefaults(doc2.Database); ln.LayerId = lay; ms.AppendEntity(ln); tr.AddNewlyCreatedDBObject(ln, true); AddText(tr, ms, lay, doc2.Database, M3(h) + " m", new Point3d((pa.X + pb.X) / 2, (pa.Y + pb.Y) / 2, 0)); });
                 }
             });
         }

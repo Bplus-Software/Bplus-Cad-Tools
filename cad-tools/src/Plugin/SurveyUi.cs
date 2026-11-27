@@ -58,7 +58,7 @@ namespace BPlus.LiveMap
                 custom.TextChanged += (s, e) => reload(); del.SelectedIndexChanged += (s, e) => reload(); path.Leave += (s, e) => reload();
                 ok.Click += (s, e) =>
                 {
-                    double h; if (!double.TryParse(th.Text.Trim(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out h) || h <= 0) { MessageBox.Show(f, "Text height must be a number above zero.", "BPlus"); return; }
+                    double h; if (!Theme.TryNum(th.Text, out h) || h <= 0 || h > 50) { MessageBox.Show(f, "Text height must be a number above zero and not more than 50 (drawing units, normally metres). Example: 0.5", "BPlus"); return; }
                     c.TextH = h; c.Labels = lab.Checked; c.Path = path.Text.Trim(); c.Delim = DelimCodes[del.SelectedIndex]; f.DialogResult = DialogResult.OK;
                 };
                 cancel.Click += (s, e) => f.DialogResult = DialogResult.Cancel;

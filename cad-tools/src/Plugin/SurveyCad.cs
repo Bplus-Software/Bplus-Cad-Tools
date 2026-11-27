@@ -94,6 +94,7 @@ namespace BPlus.LiveMap
 
         public static int Import(Document doc, List<SurveyPoint> pts, CodeRules rules, bool labels, double textH, bool setStyle)
         {
+            if (!(textH > 0) || textH > 50) textH = 1;
             var db = doc.Database; int n = 0;
             using (doc.LockDocument())
             using (var tr = db.TransactionManager.StartTransaction())
@@ -119,7 +120,7 @@ namespace BPlus.LiveMap
                 }
                 tr.Commit();
             }
-            if (setStyle) { try { AcApp.SetSystemVariable("PDMODE", 35); AcApp.SetSystemVariable("PDSIZE", -2); } catch (Exception e) { Log.Write("PDMODE: " + e.Message); } }
+            if (setStyle) { try { if (Convert.ToInt32(AcApp.GetSystemVariable("PDMODE")) == 0) { AcApp.SetSystemVariable("PDMODE", 35); AcApp.SetSystemVariable("PDSIZE", -2); } else { double ps = Convert.ToDouble(AcApp.GetSystemVariable("PDSIZE")); if (ps > 1000 || ps < -50) AcApp.SetSystemVariable("PDSIZE", -2); } } catch (Exception e) { Log.Write("PDMODE: " + e.Message); } }
             return n;
         }
 

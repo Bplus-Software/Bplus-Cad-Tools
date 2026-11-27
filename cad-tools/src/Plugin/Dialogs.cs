@@ -10,6 +10,20 @@ namespace BPlus.LiveMap
     {
         public static readonly Color Bar = Color.FromArgb(34, 41, 51), Panel = Color.FromArgb(61, 70, 84), Field = Color.FromArgb(33, 40, 48), Text = Color.FromArgb(235, 238, 242), Dim = Color.FromArgb(160, 170, 185), Accent = Color.FromArgb(0, 120, 215);
         [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int val, int size);
+        [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)] static extern int SetWindowTheme(IntPtr h, string app, string idlist);
+        /// <summary>Dark scroll bars (Windows 10 1903 and later, Windows 11). On older Windows it silently stays the default bar.</summary>
+        public static void DarkScroll(Control c)
+        {
+            Action go = () => { try { SetWindowTheme(c.Handle, "DarkMode_Explorer", null); } catch { } };
+            if (c.IsHandleCreated) go(); else c.HandleCreated += (s, e) => go();
+        }
+        /// <summary>Reads a typed number. Accepts a dot or a comma (or Arabic) as the decimal mark and Arabic-Indic digits. A comma is never a thousands mark ("0,5" is 0.5, not 5).</summary>
+        public static bool TryNum(string s, out double v)
+        {
+            v = 0; if (s == null) return false; var sb = new System.Text.StringBuilder();
+            foreach (char ch in s.Trim()) { if (ch >= '\u0660' && ch <= '\u0669') sb.Append((char)('0' + (ch - '\u0660'))); else if (ch >= '\u06F0' && ch <= '\u06F9') sb.Append((char)('0' + (ch - '\u06F0'))); else if (ch == ',' || ch == '\u066B' || ch == '\u060C') sb.Append('.'); else if (ch == ' ' || ch == '\u00A0') continue; else sb.Append(ch); }
+            return double.TryParse(sb.ToString(), System.Globalization.NumberStyles.AllowLeadingSign | System.Globalization.NumberStyles.AllowDecimalPoint, System.Globalization.CultureInfo.InvariantCulture, out v) && !double.IsNaN(v) && !double.IsInfinity(v);
+        }
         public static void DarkTitle(Form f)
         {
             f.HandleCreated += (s, e) => { try { int on = 1; if (DwmSetWindowAttribute(f.Handle, 20, ref on, 4) != 0) DwmSetWindowAttribute(f.Handle, 19, ref on, 4); } catch { } };
@@ -37,6 +51,16 @@ namespace BPlus.LiveMap
             return f;
         }
         /// <summary>Sizes a dialog from its design numbers (taken before scaling) times the real screen scale, twice (Load and Shown), capped to the working area. Content never depends on measuring scaled controls.</summary>
+        /// <summary>Multiplies the position and size of every child control by s, once. Docked controls keep their dock.</summary>
+        public static void Scale(Control parent, float s)
+        {
+            if (Math.Abs(s - 1f) < 0.01f) return;
+            foreach (Control c in parent.Controls)
+            {
+                if (c.Dock == DockStyle.None) c.SetBounds((int)Math.Round(c.Left * s), (int)Math.Round(c.Top * s), (int)Math.Round(c.Width * s), (int)Math.Round(c.Height * s));
+                Scale(c, s);
+            }
+        }
         public static void Fit(Form f, Panel body, Panel bar, Rectangle wa, int designW, int designBottom)
         {
             Action go = () =>
@@ -46,7 +70,7 @@ namespace BPlus.LiveMap
                 int extraW = f.Width - f.ClientSize.Width, extraH = f.Height - f.ClientSize.Height;
                 int w = Math.Min(cw + extraW, wa.Width - 20), h = Math.Min(ch + extraH, wa.Height - 20);
                 f.Size = new Size(w, h); f.Location = new Point(wa.Left + (wa.Width - w) / 2, wa.Top + (wa.Height - h) / 2);
-                if (body.AutoScroll) body.AutoScrollMinSize = new Size(0, (int)Math.Ceiling((designBottom + 16) * sc));
+                if (body.AutoScroll) body.AutoScrollMinSize = new Size(0, (int)Math.Ceiling((designBottom + 8) * sc));
             };
             f.Load += (s, e) => go(); f.Shown += (s, e) => go();
         }

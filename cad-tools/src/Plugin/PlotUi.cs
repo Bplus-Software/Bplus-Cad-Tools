@@ -13,6 +13,13 @@ namespace BPlus.LiveMap
     {
         public List<string> Layouts = new List<string>(); public bool OwnSetup, Pdf = true, Combined = true, Lineweights = true;
         public string Device, MediaCanonical, Scale = "Fit", Style = "", Folder = "", Pattern = "{drawing}-{layout}"; public int Rotation;
+        /// <summary>Per layout overrides from the list: name -> { canonical paper or null, scale or null, rotation (0/1) or null }. Used only with "My settings".</summary>
+        public Dictionary<string, string[]> Over = new Dictionary<string, string[]>();
+        public PlotChoice For(string layout)
+        {
+            var c = (PlotChoice)MemberwiseClone(); string[] o; if (OwnSetup || !Over.TryGetValue(layout, out o)) return c;
+            if (!string.IsNullOrEmpty(o[0])) c.MediaCanonical = o[0]; if (!string.IsNullOrEmpty(o[1])) c.Scale = o[1]; if (!string.IsNullOrEmpty(o[2])) c.Rotation = int.Parse(o[2]); return c;
+        }
     }
 
     static class PlotUi
@@ -35,12 +42,12 @@ namespace BPlus.LiveMap
             using (var f = Theme.Base("B+ CAD Tools - Plot layouts", 700, 700))
             {
                 // Three calm cards: Layouts, Page, Save as. Scales with the screen's DPI, sizes itself to its content (capped to the screen), buttons always visible.
-                f.AutoScaleDimensions = new SizeF(96f, 96f); f.AutoScaleMode = AutoScaleMode.Dpi;
+                f.AutoScaleMode = AutoScaleMode.None; // no WinForms autoscale (it mixed scaled and unscaled cards on his screen); all geometry is scaled once by Theme.Scale below
                 f.FormBorderStyle = FormBorderStyle.Sizable; f.MaximizeBox = true; f.MinimumSize = new Size(560, 420);
                 var wa = Screen.FromControl(f).WorkingArea; f.StartPosition = FormStartPosition.Manual;
                 var bar = new Panel { Dock = DockStyle.Bottom, Height = 56, BackColor = Theme.Bar };
-                var body = new Panel { Dock = DockStyle.Fill, AutoScroll = false, BackColor = Theme.Bar };
-                f.Controls.Add(body); f.Controls.Add(bar); bar.BringToFront(); body.BringToFront();
+                var body = new Panel { Dock = DockStyle.Fill, AutoScroll = true, BackColor = Theme.Bar }; // scrolls only when the screen is too small; Plot/Cancel bar is outside it
+                Theme.DarkScroll(body); f.Controls.Add(body); f.Controls.Add(bar); bar.BringToFront(); body.BringToFront();
 
                 // Card 1: layouts
                 f.Font = new System.Drawing.Font("Segoe UI", 10f);
@@ -51,14 +58,24 @@ namespace BPlus.LiveMap
                 var c1 = Card(body, 14, 30 + listH + 30, "LAYOUTS");
                 var all = new Label { Text = "All", Left = 540, Top = 10, Width = 40, Height = 18, ForeColor = Theme.Accent, BackColor = Color.Transparent, Cursor = Cursors.Hand };
                 var none = new Label { Text = "None", Left = 590, Top = 10, Width = 60, Height = 18, ForeColor = Theme.Accent, BackColor = Color.Transparent, Cursor = Cursors.Hand };
-                var list = new Panel { Left = 16, Top = 32, Width = 636, Height = listH, BackColor = Theme.Field, AutoScroll = true };
-                var checks = new List<CheckBox>();
+                var list = new Panel { Left = 16, Top = 32, Width = 636, Height = listH, BackColor = Theme.Field, AutoScroll = true }; Theme.DarkScroll(list);
+                var checks = new List<CheckBox>(); var rowMed = new List<ComboBox>(); var rowSc = new List<ComboBox>(); var rowRot = new List<ComboBox>(); var rowOv = new List<bool[]>(); List<string[]> media = null;
+                // Name column is as wide as the longest name (30 to 330 px design), paper and scale follow right after it.
+                int nameW = 150; try { nameW = rows.Select(q => TextRenderer.MeasureText(q.Name, f.Font).Width).DefaultIfEmpty(100).Max() + 40; } catch { }
+                { float sn = 1f; try { using (var g1 = f.CreateGraphics()) sn = g1.DpiY / 96f; } catch { } nameW = (int)(nameW / sn); } nameW = Math.Max(110, Math.Min(190, nameW));
                 for (int k = 0; k < rows.Count; k++)
                 {
                     var r = rows[k];
-                    var cb = new CheckBox { Text = r.Name, Left = 10, Top = 4 + k * 34, Width = 420, Height = 28, Checked = true, ForeColor = Theme.Text, BackColor = Color.Transparent };
-                    var info = new Label { Text = (string.IsNullOrEmpty(r.Paper) ? "" : r.Paper) + (string.IsNullOrEmpty(r.Scale) ? "" : "   " + r.Scale), Left = 416, Top = 4 + k * 34, Width = 210, Height = 28, TextAlign = ContentAlignment.MiddleRight, ForeColor = Theme.Dim, BackColor = Color.Transparent };
-                    list.Controls.Add(cb); list.Controls.Add(info); checks.Add(cb);
+                    var cb = new CheckBox { Text = r.Name, Left = 10, Top = 4 + k * 34, Width = nameW, Height = 28, Checked = true, ForeColor = Theme.Text, BackColor = Color.Transparent };
+                    int rx = 10 + nameW + 8;
+                    var rm = new ComboBox { Left = rx, Top = 3 + k * 34, Width = 150, DropDownStyle = ComboBoxStyle.DropDownList, FlatStyle = FlatStyle.Flat }; Theme.Style(rm);
+                    var rs = new ComboBox { Left = rx + 158, Top = 3 + k * 34, Width = 84, DropDownStyle = ComboBoxStyle.DropDownList, FlatStyle = FlatStyle.Flat }; Theme.Style(rs); rs.Items.AddRange(new object[] { "Fit", "1:50", "1:100", "1:200", "1:250", "1:500", "1:1000" }); rs.SelectedIndex = 0;
+                    var ro = new ComboBox { Left = rx + 250, Top = 3 + k * 34, Width = 120, DropDownStyle = ComboBoxStyle.DropDownList, FlatStyle = FlatStyle.Flat }; Theme.Style(ro); ro.Items.AddRange(new object[] { "As in the layout", "Turned 90\u00B0" }); ro.SelectedIndex = 0;
+                    var flag = new bool[1]; rowOv.Add(flag); Action<ComboBox> mark = c0 => { flag[0] = true; c0.ForeColor = Theme.Text; };
+                    rm.SelectionChangeCommitted += (s0, e0) => mark(rm); rs.SelectionChangeCommitted += (s0, e0) => mark(rs); ro.SelectionChangeCommitted += (s0, e0) => mark(ro);
+                    rowMed.Add(rm); rowSc.Add(rs); rowRot.Add(ro);
+                    list.Controls.Add(rm); list.Controls.Add(rs); list.Controls.Add(ro);
+                    list.Controls.Add(cb); checks.Add(cb);
                 }
                 var cnt = Small(c1, "", 16, 32 + listH + 6, 636);
                 Action upd = () => { int t = checks.Count(c => c.Checked); cnt.Text = t + " of " + rows.Count + " ticked. The Model tab is not plotted by this tool."; };
@@ -101,13 +118,27 @@ namespace BPlus.LiveMap
                 Small(c3, "File name", 16, 126, 80); var pat = new TextBox { Left = 100, Top = 122, Width = 300, Text = "{drawing}-{layout}", BorderStyle = BorderStyle.FixedSingle }; Theme.Style(pat); c3.Controls.Add(pat);
                 var ex = Small(c3, "", 100, 150, 552);
                 var msNote = Small(c3, "Microsoft Print to PDF: Windows may ask where to save each file. Choose the folder and click Save. One PDF per layout. It stops after 2 minutes.", 16, 172, 636); msNote.Visible = false;
-                dev.TextChanged += (s, e) => msNote.Visible = dev.Text.IndexOf("microsoft", StringComparison.OrdinalIgnoreCase) >= 0;
+                dev.TextChanged += (s, e) => { bool m = dev.Text.IndexOf("microsoft", StringComparison.OrdinalIgnoreCase) >= 0; msNote.Visible = m; if (m) { sep.Checked = true; one.Enabled = false; } else one.Enabled = pdf.Checked; };
                 Action exUpd = () => ex.Text = pdf.Checked ? (one.Checked ? "File: " + PlotNaming.FileName("{drawing}", drawing, "") + ".pdf" : "e.g. " + PlotNaming.FileName(pat.Text, drawing, rows.Count > 0 ? rows[0].Name : "Layout1") + ".pdf") : "";
                 pat.TextChanged += (s, e) => exUpd(); one.CheckedChanged += (s, e) => exUpd();
                 br.Click += (s, e) => { using (var d = new FolderBrowserDialog { SelectedPath = fold.Text }) if (d.ShowDialog(f) == DialogResult.OK) fold.Text = d.SelectedPath; };
-                body.AutoScrollMinSize = Size.Empty;
+                
 
-                List<string[]> media = new List<string[]>();
+                media = new List<string[]>();
+                // Rows not changed by hand follow the Page card (dim text); a row changed by hand keeps its own value (normal text).
+                Action syncRows = () =>
+                {
+                    for (int k = 0; k < rowMed.Count; k++)
+                    {
+                        var ovf = rowOv[k][0];
+                        if (ovf) { if (rowMed[k].SelectedIndex < 0 && rowMed[k].Items.Count > 0) { rowOv[k][0] = false; ovf = false; } else continue; }
+                        rowMed[k].ForeColor = rowSc[k].ForeColor = rowRot[k].ForeColor = Theme.Dim;
+                        if (med.SelectedIndex >= 0 && med.SelectedIndex < rowMed[k].Items.Count) rowMed[k].SelectedIndex = med.SelectedIndex;
+                        string st = sc.Text.Trim(); int si = rowSc[k].Items.IndexOf(st); if (si < 0 && st.Length > 0) si = rowSc[k].Items.Add(st); rowSc[k].SelectedIndex = si;
+                        rowRot[k].SelectedIndex = Math.Max(0, rot.SelectedIndex);
+                    }
+                };
+                med.SelectedIndexChanged += (s, e) => syncRows(); sc.TextChanged += (s, e) => syncRows(); rot.SelectedIndexChanged += (s, e) => syncRows();
                 Action fillMed = () =>
                 {
                     med.Items.Clear(); media = dev.Text.Length == 0 ? new List<string[]>() : lists.Media(dev.Text); foreach (var m in media) med.Items.Add(m[1]);
@@ -116,6 +147,8 @@ namespace BPlus.LiveMap
                     if (!string.IsNullOrEmpty(want)) idx = media.FindIndex(m => string.Equals(m[0], want, StringComparison.OrdinalIgnoreCase));
                     if (idx < 0) { idx = media.FindIndex(m => m[0].IndexOf("A4", StringComparison.OrdinalIgnoreCase) >= 0 && m[0].IndexOf("Extended", StringComparison.OrdinalIgnoreCase) < 0 && m[0].IndexOf("Tab", StringComparison.OrdinalIgnoreCase) < 0); }
                     if (med.Items.Count > 0) med.SelectedIndex = idx >= 0 ? idx : 0;
+                    foreach (var rm in rowMed) { rm.Items.Clear(); foreach (var m in media) rm.Items.Add(m[1]); }
+                    syncRows();
                 };
                 Action fillDev = () =>
                 {
@@ -127,10 +160,10 @@ namespace BPlus.LiveMap
                     dev.SelectedIndex = i; fillMed(); exUpd();
                 };
                 dev.SelectedIndexChanged += (s, e) => fillMed();
-                pdf.CheckedChanged += (s, e) => { fillDev(); one.Enabled = sep.Enabled = br.Enabled = fold.Enabled = pat.Enabled = pdf.Checked; };
+                pdf.CheckedChanged += (s, e) => { fillDev(); one.Enabled = pdf.Checked && dev.Text.IndexOf("microsoft", StringComparison.OrdinalIgnoreCase) < 0; sep.Enabled = br.Enabled = fold.Enabled = pat.Enabled = pdf.Checked; };
                 sty.Items.Add("(as in the layout)"); foreach (var st in lists.Styles) sty.Items.Add(st); sty.SelectedIndex = 0;
                 fillDev();
-                Action custom = () => { bool on = my.Checked; dev.Enabled = med.Enabled = sc.Enabled = sty.Enabled = rot.Enabled = lw.Enabled = on; };
+                Action custom = () => { bool on = my.Checked; foreach (var c in rowMed.Concat<ComboBox>(rowSc).Concat(rowRot)) c.Enabled = on; dev.Enabled = med.Enabled = sc.Enabled = sty.Enabled = rot.Enabled = lw.Enabled = on; };
                 my.CheckedChanged += (s, e) => custom(); custom();
 
                 var ok = Theme.Btn("Plot", 0, 14, 120, true); var cancel = Theme.Btn("Cancel", 0, 14, 100); ok.Anchor = cancel.Anchor = AnchorStyles.Top | AnchorStyles.Right;
@@ -144,10 +177,11 @@ namespace BPlus.LiveMap
                     if (string.IsNullOrWhiteSpace(fold.Text) && pdf.Checked) { MessageBox.Show(f, "Choose a folder for the PDF files.", "B+ CAD Tools"); return; }
                     if (my.Checked) { if (med.SelectedIndex < 0 || med.SelectedIndex >= media.Count) { MessageBox.Show(f, "Choose a paper size for this printer first.", "B+ CAD Tools"); return; } if (dev.Text.Length == 0) { MessageBox.Show(f, "No printer or PDF device is available for this choice.", "B+ CAD Tools"); return; } if (PlotNaming.ParseScale(sc.Text) < 0) { MessageBox.Show(f, "Scale: type Fit or something like 1:500.", "B+ CAD Tools"); return; } }
                     res = new PlotChoice { OwnSetup = own.Checked, Pdf = pdf.Checked, Combined = one.Checked, Lineweights = lw.Checked, Device = dev.Text, MediaCanonical = med.SelectedIndex >= 0 && med.SelectedIndex < media.Count ? media[med.SelectedIndex][0] : null, Scale = sc.Text, Style = sty.SelectedIndex > 0 ? sty.Text : "", Folder = fold.Text.Trim(), Pattern = pat.Text, Rotation = rot.SelectedIndex, Layouts = ticked };
+                    for (int k = 0; k < checks.Count; k++) { if (!checks[k].Checked || !rowOv[k][0]) continue; string cn = rowMed[k].SelectedIndex >= 0 && rowMed[k].SelectedIndex < media.Count ? media[rowMed[k].SelectedIndex][0] : null; string sc1 = rowSc[k].Text; string ro1 = rowRot[k].SelectedIndex.ToString(); res.Over[rows[k].Name] = new[] { cn, sc1, ro1 }; }
                     f.DialogResult = DialogResult.OK;
                 };
                 cancel.Click += (s, e) => f.DialogResult = DialogResult.Cancel; f.AcceptButton = ok; f.CancelButton = cancel;
-                Theme.Fit(f, body, bar, wa, 716, c3.Bottom); f.Load += (s, e) => place();
+                { float sx = 1f; try { using (var g = f.CreateGraphics()) sx = g.DpiY / 96f; } catch { } int designBottom = c3.Bottom; Theme.Scale(body, sx); bar.Height = (int)Math.Ceiling(bar.Height * sx); Theme.Scale(bar, sx); Theme.Fit(f, body, bar, wa, 716, designBottom); } f.Load += (s, e) => place();
                 return AcApp.ShowModalDialog(f) == DialogResult.OK ? res : null;
             }
         }

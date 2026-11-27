@@ -35,6 +35,32 @@ namespace BPlus.LiveMap.Core
         }
     }
 
+
+    public static class FlowMap
+    {
+        /// <summary>Arrows over the whole grid: (x, y, direction in radians, z). Inside a sink the arrow aims straight at that sink's low point. Elsewhere it follows the smooth downhill direction (the steepest slope from the cells around it, not one of 8 steps). spacing 0 = about 40 across. Flat or empty cells get no arrow.</summary>
+        public static List<double[]> Arrows(Grid g, IList<Sink> sinks, double spacing, int maxCount = 20000)
+        {
+            var res = new List<double[]>(); int nx = g.NX, ny = g.NY; if (nx < 2 || ny < 2) return res;
+            int step = spacing > 0 ? Math.Max(1, (int)Math.Round(spacing / g.Cell)) : Math.Max(1, Math.Max(nx, ny) / 40);
+            while (((nx + step - 1) / step) * ((ny + step - 1) / step) > maxCount) step++;
+            var owner = new Dictionary<int, Sink>(); if (sinks != null) foreach (var s in sinks) foreach (var k in s.Cells) owner[k] = s;
+            int w = Math.Max(1, step / 2);
+            for (int j = 0; j < ny; j += step) for (int i = 0; i < nx; i += step)
+                {
+                    int k = j * nx + i; double z = g.Z[k]; if (double.IsNaN(z)) continue; double x = g.CX(i), y = g.CY(j);
+                    Sink sk; if (owner.TryGetValue(k, out sk)) { double dx = sk.E - x, dy = sk.N - y; if (dx * dx + dy * dy < g.Cell * g.Cell) continue; res.Add(new[] { x, y, Math.Atan2(dy, dx), z }); continue; }
+                    int i0 = Math.Max(0, i - w), i1 = Math.Min(nx - 1, i + w), j0 = Math.Max(0, j - w), j1 = Math.Min(ny - 1, j + w);
+                    double zxa = g.Z[j * nx + i0], zxb = g.Z[j * nx + i1], zya = g.Z[j0 * nx + i], zyb = g.Z[j1 * nx + i];
+                    if (double.IsNaN(zxa) || double.IsNaN(zxb) || double.IsNaN(zya) || double.IsNaN(zyb) || i1 == i0 || j1 == j0) continue;
+                    double gx = (zxb - zxa) / ((i1 - i0) * g.Cell), gy = (zyb - zya) / ((j1 - j0) * g.Cell);
+                    if (Math.Sqrt(gx * gx + gy * gy) < 1e-6) continue;
+                    res.Add(new[] { x, y, Math.Atan2(-gy, -gx), z });
+                }
+            return res;
+        }
+    }
+
     public static class Sinks
     {
         const int MaxCells = 2000000;

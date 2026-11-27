@@ -144,6 +144,18 @@ public class GoogleParseTests
         int e, n; CoordConvert.GuessColumns("1,669459.622,2734271.672,612.5,TP", out e, out n); Assert.Equal(2, e); Assert.Equal(3, n);
     }
 
+    [Fact] public void FlowArrowsFollowSlopeAndAimAtLowPoint()
+    {
+        var g = new Grid { X0 = 0, Y0 = 0, Cell = 1, NX = 21, NY = 21 }; g.Z = new double[441];
+        for (int j = 0; j < 21; j++) for (int i = 0; i < 21; i++) g.Z[j * 21 + i] = 10 + i * 0.1; // falls towards west (x decreasing)
+        var ar = FlowMap.Arrows(g, null, 4); Assert.NotEmpty(ar);
+        foreach (var a in ar) Assert.True(Math.Abs(Math.Abs(a[2]) - Math.PI) < 1e-6, "west");
+        for (int j = 0; j < 21; j++) for (int i = 0; i < 21; i++) g.Z[j * 21 + i] = 10 + j * 0.1; // falls towards south
+        foreach (var a in FlowMap.Arrows(g, null, 4)) Assert.True(Math.Abs(a[2] + Math.PI / 2) < 1e-6, "south");
+        var sk = new Sink { E = 15, N = 15 }; for (int k = 0; k < 441; k++) sk.Cells.Add(k);
+        foreach (var a in FlowMap.Arrows(g, new[] { sk }, 4)) { double want = Math.Atan2(15 - a[1], 15 - a[0]); Assert.True(Math.Abs(a[2] - want) < 1e-9); }
+    }
+
     [Fact] public void SinkArrowsPointDownhillToTheCentre()
     {
         var g = new Grid { X0 = 0, Y0 = 0, Cell = 1, NX = 11, NY = 11 }; g.Z = new double[121];

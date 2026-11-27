@@ -130,12 +130,24 @@ namespace BPlus.LiveMap
                     }, true);
                     step("units", () => psv.SetPlotPaperUnits(ps, PlotPaperUnit.Millimeters), false);
                     step("plot area", () => psv.SetPlotType(ps, Autodesk.AutoCAD.DatabaseServices.PlotType.Layout), false);
-                    step("rotation", () => psv.SetPlotRotation(ps, ch.Rotation == 0 ? PlotRotation.Degrees000 : PlotRotation.Degrees090), false);
+                    // Orientation follows the layout (never forced to portrait). Compare the layout's sheet with the chosen paper.
+                    double lw0 = 0, lh0 = 0, pw0 = 0, ph0 = 0; bool sameSheet = false;
+                    step("rotation", () =>
+                    {
+                        bool landLayout = true;
+                        try { var a = lo.PlotPaperSize; lw0 = a.X; lh0 = a.Y; bool r0 = lo.PlotRotation == PlotRotation.Degrees000 || lo.PlotRotation == PlotRotation.Degrees180; landLayout = r0 ? a.X >= a.Y : a.Y >= a.X; } catch { }
+                        var b = ps.PlotPaperSize; pw0 = b.X; ph0 = b.Y;
+                        bool wantLand = ch.Rotation == 0 ? landLayout : !landLayout;
+                        psv.SetPlotRotation(ps, (pw0 >= ph0) == wantLand ? PlotRotation.Degrees000 : PlotRotation.Degrees090);
+                        sameSheet = lw0 > 0 && Math.Abs(Math.Max(lw0, lh0) - Math.Max(pw0, ph0)) < 1.5 && Math.Abs(Math.Min(lw0, lh0) - Math.Min(pw0, ph0)) < 1.5;
+                        Log.Write("BPPLOT " + lo.LayoutName + ": layout sheet " + lw0.ToString("0") + "x" + lh0.ToString("0") + ", chosen paper " + pw0.ToString("0") + "x" + ph0.ToString("0") + ", same sheet " + sameSheet);
+                    }, false);
                     double ratio = PlotNaming.ParseScale(ch.Scale);
                     // A paper space layout is already laid out at paper size: "Fit" means 1:1 on the sheet.
                     step("centre", () => psv.SetPlotCentered(ps, false), false);
                     step("origin", () => psv.SetPlotOrigin(ps, new Autodesk.AutoCAD.Geometry.Point2d(0, 0)), false);
-                    if (ratio == 0) step("scale", () => { psv.SetUseStandardScale(ps, true); psv.SetStdScaleType(ps, StdScaleType.StdScale1To1); }, false);
+                    // Fit = 1:1 when the paper is the layout's own sheet. On a different paper size, 1:1 would crop the drawing, so shrink to fit instead.
+                    if (ratio == 0) step("scale", () => { psv.SetUseStandardScale(ps, true); psv.SetStdScaleType(ps, sameSheet ? StdScaleType.StdScale1To1 : StdScaleType.ScaleToFit); if (!sameSheet) { psv.SetPlotCentered(ps, true); } }, false);
                     else step("scale", () => { psv.SetUseStandardScale(ps, false); psv.SetCustomPrintScale(ps, new CustomScale(1.0, PlotNaming.DrawingUnitsPerPaperMm(ratio, unit))); }, true);
                     if (!string.IsNullOrEmpty(ch.Style)) step("plot style", () => psv.SetCurrentStyleSheet(ps, ch.Style), false);
                     step("line weights", () => ps.PrintLineweights = ch.Lineweights, false);
@@ -240,7 +252,7 @@ namespace BPlus.LiveMap
                                     {
                                         var ld = (DBDictionary)tr.GetObject(db.LayoutDictionaryId, OpenMode.ForRead);
                                         var lo = (Layout)tr.GetObject(ld.GetAt(name), OpenMode.ForRead); string how; PlotSettings keep;
-                                        var pi = BuildInfo(lo, ch, unit, out how, out keep); keepers.Add(keep); pis.Add(new KeyValuePair<string, PlotInfo>(name, pi));
+                                        var pi = BuildInfo(lo, ch.For(name), unit, out how, out keep); keepers.Add(keep); pis.Add(new KeyValuePair<string, PlotInfo>(name, pi));
                                         tr.Commit();
                                     }
                                 }
