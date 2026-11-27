@@ -495,3 +495,11 @@ namespace BPlus.LiveMap.Core.Tests { public class SectionCrowdTests { [Xunit.Fac
  Xunit.Assert.True(m.Texts.Count(t => t.Kind == "pt") <= 25); Xunit.Assert.Contains("left out", w);
  Xunit.Assert.True(m.Texts.Count(t => t.Kind == "elev") <= 14);
  } } }
+namespace BPlus.LiveMap.Core.Tests { public class ContourTests {
+ static System.Collections.Generic.List<Tri> Cone() { var t = new System.Collections.Generic.List<Tri>(); Func<int,int,double> Z = (i, j) => System.Math.Sqrt((i - 10.0) * (i - 10.0) + (j - 10.0) * (j - 10.0)); for (int i = 0; i < 20; i++) for (int j = 0; j < 20; j++) { t.Add(new Tri(i, j, Z(i, j), i + 1, j, Z(i + 1, j), i + 1, j + 1, Z(i + 1, j + 1))); t.Add(new Tri(i, j, Z(i, j), i + 1, j + 1, Z(i + 1, j + 1), i, j + 1, Z(i, j + 1))); } return t; }
+ [Xunit.Fact] public void ConeLevelIsOneClosedCircle() { var c = Contour.FromTris(Cone(), 5.0, 0); Xunit.Assert.Single(c); Xunit.Assert.True(c[0].Closed); Xunit.Assert.InRange(c[0].Length, 2 * System.Math.PI * 5 * 0.95, 2 * System.Math.PI * 5 * 1.05); }
+ [Xunit.Fact] public void MaxEdgeDropsLongTriangles() { Xunit.Assert.Empty(Contour.FromTris(Cone(), 5.0, 0.5)); }
+ [Xunit.Fact] public void GridContourClosed() { var g = new Grid { X0 = 0, Y0 = 0, Cell = 1, NX = 21, NY = 21, Z = new double[441] }; for (int j = 0; j < 21; j++) for (int i = 0; i < 21; i++) g.Z[j * 21 + i] = System.Math.Sqrt((i - 10.0) * (i - 10.0) + (j - 10.0) * (j - 10.0)); var c = Contour.FromGrid(g, 4.0); Xunit.Assert.Single(c); Xunit.Assert.True(c[0].Closed); }
+ [Xunit.Fact] public void LevelsAndIndex() { var l = Contour.Levels(54.2, 56.1, 0.5); Xunit.Assert.Equal(new[] { 54.5, 55.0, 55.5, 56.0 }, l.ToArray()); Xunit.Assert.True(Contour.IsIndex(55.0, 0.5, 5)); Xunit.Assert.False(Contour.IsIndex(55.5, 0.5, 5)); Xunit.Assert.Equal(1, Contour.Decimals(0.5)); Xunit.Assert.Equal(0, Contour.Decimals(1)); }
+ [Xunit.Fact] public void LabelNeverUpsideDown() { var c = new ContourLine { Closed = false, Length = 20 }; c.Pts.Add(new[] { 10.0, 0 }); c.Pts.Add(new[] { 0.0, 0 }); var s = Contour.LabelSpot(c, 5); Xunit.Assert.InRange(s[2], -90, 90); Xunit.Assert.Null(Contour.LabelSpot(c, 50)); }
+} }
