@@ -62,10 +62,11 @@ namespace BPlus.LiveMap
             public double Interval = 20, Half = 15, Strip = 2.5, Ve = 1, Start, End, TextH, CentreLevel = double.NaN, SwL, SwR, PlL, PlR, Kerb, Cross; public double[] Lanes = new double[0]; public bool Divide, Labels = true, GroundLine = true; public short GroundCol = 3; public int Cols = 3;
         }
 
+        internal static bool AdvOpen;
         public static bool Ask(double length, bool havePts, double th, out Choice ch)
         {
             var res = new Choice { TextH = th }; bool good = false; var pre = Presets();
-            using (var f = Theme.Base("B+ CAD Tools - Quick section", 600, 660))
+            using (var f = Theme.Base("B+ CAD Tools - Quick section", 600, 346))
             {
                 Func<string, int, int, int, Label> L = (t, x, y, w) => Theme.Lbl(t, x, y, w);
                 f.Controls.Add(Theme.Lbl("Line length " + length.ToString("F2", CultureInfo.InvariantCulture) + " m. Left of the line is negative, right is positive.", 16, 10, 560, true));
@@ -80,10 +81,21 @@ namespace BPlus.LiveMap
                 f.Controls.Add(L("Road type", 16, 127, 130)); f.Controls.Add(typ);
                 string[] nm = { "Lane widths (m, left to right, comma)", "Sidewalk left (m)", "Sidewalk right (m)", "Planting left (m)", "Planting right (m)", "Kerb height (m)", "Crossfall (%)", "Centre level (m), empty = ground", "Station interval (m)", "Half-width each side (m)", "Strip along the line (m)", "Vertical exaggeration", "Road width at start (m)", "Road width at end (m)", "Sections per row", "Text height" };
                 var tb = new TextBox[nm.Length];
+                var adv = new Panel { Left = 0, Top = 230, Width = 590, Height = 324, BackColor = Color.Transparent, Visible = SectionUi.AdvOpen };
+                int[] ess = { 9, 8, 11 }; int ai = 0;
                 for (int i = 0; i < nm.Length; i++)
                 {
-                    int col = i == 0 ? 0 : (i - 1) % 2, row = i == 0 ? 0 : 1 + (i - 1) / 2; int x = i == 0 ? 16 : 16 + col * 290; int y = 160 + row * 32;
-                    f.Controls.Add(Theme.Lbl(nm[i], x, y + 3, i == 0 ? 280 : 190)); tb[i] = new TextBox { Left = i == 0 ? 300 : x + 195, Top = y, Width = i == 0 ? 280 : 80, BorderStyle = BorderStyle.FixedSingle }; Theme.Style(tb[i]); f.Controls.Add(tb[i]);
+                    int ei = Array.IndexOf(ess, i);
+                    if (ei >= 0)
+                    {
+                        string[] sh = { "Half-width each side (m)", "Station interval (m)", "Vertical exaggeration" };
+                        int ex = 16 + ei * 196; f.Controls.Add(Theme.Lbl(sh[ei], ex, 160, 190)); tb[i] = new TextBox { Left = ex, Top = 180, Width = 80, BorderStyle = BorderStyle.FixedSingle }; Theme.Style(tb[i]); f.Controls.Add(tb[i]);
+                    }
+                    else
+                    {
+                        int k = ai++; int col = k == 0 ? 0 : (k - 1) % 2, row = k == 0 ? 0 : 1 + (k - 1) / 2; int x = k == 0 ? 16 : 16 + col * 290; int y = 4 + row * 32;
+                        adv.Controls.Add(Theme.Lbl(nm[i], x, y + 3, k == 0 ? 280 : 190)); tb[i] = new TextBox { Left = k == 0 ? 300 : x + 195, Top = y, Width = k == 0 ? 280 : 80, BorderStyle = BorderStyle.FixedSingle }; Theme.Style(tb[i]); adv.Controls.Add(tb[i]);
+                    }
                 }
                 Action<int> fillFrom = idx =>
                 {
@@ -91,14 +103,21 @@ namespace BPlus.LiveMap
                 };
                 fillFrom(1); typ.SelectedIndexChanged += (s, e) => fillFrom(typ.SelectedIndex);
                 tb[7].Text = ""; tb[8].Text = "20"; tb[9].Text = "15"; tb[10].Text = "2.5"; tb[11].Text = "1"; tb[12].Text = ""; tb[13].Text = ""; tb[14].Text = "3"; tb[15].Text = N(th);
-                int by = 160 + 9 * 32;
+                int by = 4 + 7 * 32;
                 var div = new CheckBox { Left = 16, Top = by, Width = 560, Text = "Existing road: divide the picked (or start/end) width equally among the lanes typed above", Checked = true, ForeColor = Theme.Text, BackColor = Color.Transparent };
                 var lab = new CheckBox { Left = 16, Top = by + 28, Width = 290, Text = "Label every ground point (number and level)", Checked = true, ForeColor = Theme.Text, BackColor = Color.Transparent };
                 var glc = new CheckBox { Left = 310, Top = by + 28, Width = 150, Text = "Show ground line, colour", Checked = true, ForeColor = Theme.Text, BackColor = Color.Transparent }; var glb = Commands.GLCombo(466, by + 26, 110); glc.CheckedChanged += (s2, e2) => glb.Enabled = glc.Checked;
                 var note = Theme.Lbl("Whole road with an existing road: type the road width at the start and the end; it is interpolated along the line, centred on the line. One station: you pick the two edges and the centre.", 16, by + 56, 560, true); note.Height = 40;
-                var info = new Label { Left = 16, Top = by + 98, Width = 560, Height = 36, ForeColor = Color.FromArgb(255, 150, 120), BackColor = Color.Transparent };
-                f.Controls.AddRange(new Control[] { div, lab, glc, glb, note, info });
-                var edit = Theme.Btn("Edit road presets...", 16, 590, 170); var editA = Theme.Btn("Edit assemblies...", 192, 590, 170); var ok = Theme.Btn("Next", 410, 590, 80, true); var cancel = Theme.Btn("Cancel", 498, 590, 80);
+                var info = new Label { Left = 16, Top = 232, Width = 560, Height = 36, ForeColor = Color.FromArgb(255, 150, 120), BackColor = Color.Transparent };
+                adv.Controls.AddRange(new Control[] { div, lab, glc, glb, note }); f.Controls.Add(adv);
+                var advBtn = Theme.Btn(SectionUi.AdvOpen ? "Advanced options  (hide)" : "Advanced options  (show)", 16, 206, 220); f.Controls.Add(advBtn); f.Controls.Add(info);
+                int BY0 = 276;
+                var edit = Theme.Btn("Edit road presets...", 16, BY0, 170); var editA = Theme.Btn("Edit assemblies...", 192, BY0, 170); var ok = Theme.Btn("Next", 410, BY0, 80, true); var cancel = Theme.Btn("Cancel", 498, BY0, 80);
+                const int DELTA = 324; int collH = 346;
+                Action<bool> setAdv = open => { SectionUi.AdvOpen = open; adv.Visible = open; int d0 = open ? DELTA : 0; info.Top = 232 + d0; foreach (var c in new Control[] { edit, editA, ok, cancel }) c.Top = BY0 + d0; f.Height = collH + d0; advBtn.Text = open ? "Advanced options  (hide)" : "Advanced options  (show)"; };
+                advBtn.Click += (s, e) => setAdv(!SectionUi.AdvOpen);
+                info.TextChanged += (s, e) => { if (info.Text.Length > 0 && !SectionUi.AdvOpen) setAdv(true); };
+                setAdv(SectionUi.AdvOpen);
                 edit.Click += (s, e) => { EditPresets(); var np = Presets(); for (int i = 0; i < 3; i++) pre[i] = np[i]; fillFrom(typ.SelectedIndex); };
                 editA.Click += (s, e) => { string keep = asmBox.SelectedItem as string; AsmUi.Edit(keep); asmList = AsmUi.All(); asmBox.Items.Clear(); foreach (var a in asmList) asmBox.Items.Add(a.Name); int ix = asmList.FindIndex(a => a.Name == keep); asmBox.SelectedIndex = ix < 0 ? 0 : ix; };
                 ok.Click += (s, e) =>

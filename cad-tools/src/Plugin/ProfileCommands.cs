@@ -31,21 +31,31 @@ namespace BPlus.LiveMap
         static bool ProfileAsk(double length, double scale, double th, bool anyPts, out ProfOpts o)
         {
             o = new ProfOpts { TextH = th, Interval = ProfileMath.DefaultInterval(length) }; var res = o; bool good = false;
-            using (var f = Theme.Base("B+ CAD Tools - Quick profile", 520, 620))
+            using (var f = Theme.Base("B+ CAD Tools - Quick profile", 520, 330))
             {
                 f.Controls.Add(Theme.Lbl("Line length " + length.ToString("F2", CultureInfo.InvariantCulture) + " m.  Drawing scale 1:" + scale.ToString("0.##", CultureInfo.InvariantCulture) + " (DIMSCALE)" + ", text height suggested from the line length: change it below if you want.", 16, 14, 490, true));
                 string[] nm = { "Vertical exaggeration", "Station interval (m)", "Offset: points within (m) of the line", "Datum level (m), empty = automatic", "Text height (drawing units)", "Frame height (drawing units), empty = use exaggeration" };
                 string[] vl = { "10", ProfileMath.DefaultInterval(length).ToString(CultureInfo.InvariantCulture), "5", "", th.ToString("0.###", CultureInfo.InvariantCulture), "" };
                 var tb = new TextBox[6];
-                for (int i = 0; i < 6; i++) { f.Controls.Add(Theme.Lbl(nm[i], 16, 52 + i * 34, 300)); tb[i] = new TextBox { Left = 330, Top = 49 + i * 34, Width = 100, Text = vl[i], BorderStyle = BorderStyle.FixedSingle }; Theme.Style(tb[i]); f.Controls.Add(tb[i]); }
-                var own = new CheckBox { Left = 16, Top = 262, Width = 480, Text = "Use the levels (Z) of the line's own vertices (ignore points)", Checked = !anyPts, Enabled = anyPts, ForeColor = Theme.Text, BackColor = Color.Transparent };
-                var lab = new CheckBox { Left = 16, Top = 290, Width = 480, Text = "Label every point (number and level)", Checked = true, ForeColor = Theme.Text, BackColor = Color.Transparent };
-                var tab = new CheckBox { Left = 16, Top = 318, Width = 480, Text = "Add a table below with a summary (average, highest, lowest, height difference)", Checked = true, ForeColor = Theme.Text, BackColor = Color.Transparent };
+                var adv = new Panel { Left = 0, Top = 200, Width = 510, Height = 308, BackColor = Color.Transparent, Visible = SectionUi.AdvOpen };
+                for (int i = 0; i < 6; i++)
+                {
+                    if (i < 2) { int ex = 16 + i * 254; f.Controls.Add(Theme.Lbl(nm[i], ex, 52, 240)); tb[i] = new TextBox { Left = ex, Top = 72, Width = 100, Text = vl[i], BorderStyle = BorderStyle.FixedSingle }; Theme.Style(tb[i]); f.Controls.Add(tb[i]); }
+                    else { int k = i - 2; adv.Controls.Add(Theme.Lbl(nm[i], 16, 7 + k * 34, 300)); tb[i] = new TextBox { Left = 330, Top = 4 + k * 34, Width = 100, Text = vl[i], BorderStyle = BorderStyle.FixedSingle }; Theme.Style(tb[i]); adv.Controls.Add(tb[i]); }
+                }
+                var own = new CheckBox { Left = 16, Top = 108, Width = 480, Text = "Use the levels (Z) of the line's own vertices (ignore points)", Checked = !anyPts, Enabled = anyPts, ForeColor = Theme.Text, BackColor = Color.Transparent };
+                var lab = new CheckBox { Left = 16, Top = 136, Width = 480, Text = "Label every point (number and level)", Checked = true, ForeColor = Theme.Text, BackColor = Color.Transparent };
+                var tab = new CheckBox { Left = 16, Top = 140, Width = 480, Text = "Add a table below with a summary (average, highest, lowest, height difference)", Checked = true, ForeColor = Theme.Text, BackColor = Color.Transparent };
                 Func<string, int, bool, CheckBox> cb = (t, y, c) => new CheckBox { Left = 16, Top = y, Width = 480, Text = t, Checked = c, ForeColor = Theme.Text, BackColor = Color.Transparent };
-                var grid = cb("Show grid lines", 346, true); var drops = cb("Show a line from every point down to the datum", 374, true); var mark = cb("Mark the highest and lowest point on the profile", 402, true); var avgl = cb("Draw the average level as a line", 430, true); var glc = cb("Show the ground line, colour:", 458, true); glc.Width = 260; var glb = GLCombo(290, 456, 110); glc.CheckedChanged += (s2, e2) => glb.Enabled = glc.Checked;
-                f.Controls.AddRange(new Control[] { own, lab, tab, grid, drops, mark, avgl, glc, glb });
-                var info = new Label { Left = 16, Top = 492, Width = 490, Height = 36, ForeColor = Color.FromArgb(255, 150, 120), BackColor = Color.Transparent }; f.Controls.Add(info);
-                var ok = Theme.Btn("Next", 300, 540, 100, true); var cancel = Theme.Btn("Cancel", 410, 540, 90);
+                var grid = cb("Show grid lines", 168, true); var drops = cb("Show a line from every point down to the datum", 196, true); var mark = cb("Mark the highest and lowest point on the profile", 224, true); var avgl = cb("Draw the average level as a line", 252, true); var glc = cb("Show the ground line, colour:", 280, true); glc.Width = 260; var glb = GLCombo(290, 278, 110); glc.CheckedChanged += (s2, e2) => glb.Enabled = glc.Checked;
+                adv.Controls.AddRange(new Control[] { tab, grid, drops, mark, avgl, glc, glb }); f.Controls.AddRange(new Control[] { own, lab, adv });
+                var advBtn = Theme.Btn("Advanced options  (show)", 16, 168, 220); f.Controls.Add(advBtn);
+                var info = new Label { Left = 16, Top = 204, Width = 490, Height = 36, ForeColor = Color.FromArgb(255, 150, 120), BackColor = Color.Transparent }; f.Controls.Add(info);
+                var ok = Theme.Btn("Next", 300, 250, 100, true); var cancel = Theme.Btn("Cancel", 410, 250, 90);
+                Action<bool> setAdv = open => { SectionUi.AdvOpen = open; adv.Visible = open; int d0 = open ? 308 : 0; info.Top = 204 + d0; ok.Top = 250 + d0; cancel.Top = 250 + d0; f.Height = 330 + d0; advBtn.Text = open ? "Advanced options  (hide)" : "Advanced options  (show)"; };
+                advBtn.Click += (s, e) => setAdv(!SectionUi.AdvOpen);
+                info.TextChanged += (s, e) => { if (info.Text.Length > 0 && !SectionUi.AdvOpen) setAdv(true); };
+                setAdv(SectionUi.AdvOpen);
                 ok.Click += (s, e) =>
                 {
                     double ve, iv, off, th2, dat = double.NaN;

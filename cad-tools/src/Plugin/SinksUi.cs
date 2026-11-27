@@ -49,7 +49,16 @@ namespace BPlus.LiveMap
                     res = new SinkChoice { Source = r[0].Checked ? 0 : r[1].Checked ? 1 : 2, MinDepth = v1, MinArea = v2, Cell = v3, Point = k1.Checked, Leader = k2.Checked, Outline = k3.Checked, Low = k4.Checked, Dir = k5.Checked, Spacing = v4 }; f.DialogResult = DialogResult.OK;
                 };
                 cancel.Click += (s, e) => f.DialogResult = DialogResult.Cancel;
+                var adv = new Panel { Left = 0, Top = 226, Width = 510, Height = 296, BackColor = Color.Transparent };
+                var mv = new List<Control>(); foreach (Control c0 in f.Controls) if (c0.Top >= 190 && c0.Top <= 480) mv.Add(c0);
+                var notes = new List<Control>(); foreach (Control c0 in f.Controls) if (c0.Top >= 500 && c0.Top <= 560) notes.Add(c0);
+                foreach (var m0 in mv) { f.Controls.Remove(m0); m0.Top -= 190; adv.Controls.Add(m0); }
+                f.Controls.Add(adv);
+                var advBtn = Theme.Btn("Advanced options  (show)", 16, 190, 220); f.Controls.Add(advBtn);
                 f.Controls.AddRange(new Control[] { ok, cancel }); f.AcceptButton = ok; f.CancelButton = cancel;
+                Action<bool> setAdv = open => { SectionUi.AdvOpen = open; adv.Visible = open; int d0 = open ? 296 : 0; notes[0].Top = 232 + d0; if (notes.Count > 1) notes[1].Top = 264 + d0; ok.Top = 306 + d0; cancel.Top = 306 + d0; f.Height = 350 + d0; advBtn.Text = open ? "Advanced options  (hide)" : "Advanced options  (show)"; };
+                advBtn.Click += (s, e) => setAdv(!SectionUi.AdvOpen);
+                setAdv(SectionUi.AdvOpen);
                 return f.ShowDialog() == DialogResult.OK ? res : null;
             }
         }

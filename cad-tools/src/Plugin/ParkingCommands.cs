@@ -61,7 +61,7 @@ namespace BPlus.LiveMap
         public static bool Ask(double length, List<ParkPreset> pr, out Choice ch)
         {
             var res = new Choice(); bool good = false;
-            using (var f = Theme.Base("B+ CAD Tools - Parking", 520, 440))
+            using (var f = Theme.Base("B+ CAD Tools - Parking", 520, 396))
             {
                 f.Controls.Add(Theme.Lbl("Line length " + length.ToString("F2", CultureInfo.InvariantCulture) + " m", 16, 12, 480, true));
                 var rb = new RadioButton[3];
@@ -77,11 +77,16 @@ namespace BPlus.LiveMap
                 var cnt = new RadioButton { Left = 16, Top = 218, Width = 140, Text = "Number of stalls", ForeColor = Theme.Text, BackColor = Color.Transparent };
                 var n = new TextBox { Left = 160, Top = 216, Width = 60, Text = "5", BorderStyle = BorderStyle.FixedSingle, Enabled = false }; Theme.Style(n);
                 cnt.CheckedChanged += (s, e) => n.Enabled = cnt.Checked;
-                var num = new CheckBox { Left = 16, Top = 252, Width = 480, Text = "Number the stalls (1, 2, 3 ...)", ForeColor = Theme.Text, BackColor = Color.Transparent };
-                var ais = new CheckBox { Left = 16, Top = 278, Width = 480, Text = "Draw the aisle edge line (using the aisle width from the presets)", ForeColor = Theme.Text, BackColor = Color.Transparent };
-                f.Controls.AddRange(new Control[] { fill, cnt, n, num, ais });
-                var info = new Label { Left = 16, Top = 312, Width = 488, Height = 36, ForeColor = Color.FromArgb(255, 150, 120), BackColor = Color.Transparent }; f.Controls.Add(info);
-                var edit = Theme.Btn("Edit sizes...", 16, 376, 130); var ok = Theme.Btn("Draw", 316, 376, 90, true); var cancel = Theme.Btn("Cancel", 414, 376, 90);
+                var num = new CheckBox { Left = 16, Top = 4, Width = 480, Text = "Number the stalls (1, 2, 3 ...)", ForeColor = Theme.Text, BackColor = Color.Transparent };
+                var ais = new CheckBox { Left = 16, Top = 30, Width = 480, Text = "Draw the aisle edge line (using the aisle width from the presets)", ForeColor = Theme.Text, BackColor = Color.Transparent };
+                f.Controls.AddRange(new Control[] { fill, cnt, n });
+                var adv = new Panel { Left = 0, Top = 284, Width = 510, Height = 56, BackColor = Color.Transparent, Visible = SectionUi.AdvOpen }; adv.Controls.AddRange(new Control[] { num, ais }); f.Controls.Add(adv);
+                var advBtn = Theme.Btn("Advanced options  (show)", 16, 250, 220); f.Controls.Add(advBtn);
+                var info = new Label { Left = 16, Top = 288, Width = 488, Height = 36, ForeColor = Color.FromArgb(255, 150, 120), BackColor = Color.Transparent }; f.Controls.Add(info);
+                var edit = Theme.Btn("Edit sizes...", 16, 332, 130); var ok = Theme.Btn("Draw", 316, 332, 90, true); var cancel = Theme.Btn("Cancel", 414, 332, 90);
+                Action<bool> setAdv = open => { SectionUi.AdvOpen = open; adv.Visible = open; int d0 = open ? 56 : 0; info.Top = 288 + d0; foreach (var c in new Control[] { edit, ok, cancel }) c.Top = 332 + d0; f.Height = 396 + d0; advBtn.Text = open ? "Advanced options  (hide)" : "Advanced options  (show)"; };
+                advBtn.Click += (s, e) => setAdv(!SectionUi.AdvOpen);
+                setAdv(SectionUi.AdvOpen);
                 edit.Click += (s, e) => { EditPresets(); var np = Presets(); for (int i = 0; i < 3; i++) { pr[i] = np[i]; rb[i].Text = np[i].Name + ":  " + np[i].Width.ToString("0.##", CultureInfo.InvariantCulture) + " x " + np[i].Length.ToString("0.##", CultureInfo.InvariantCulture) + " m,  " + np[i].Pitch.ToString("0.##", CultureInfo.InvariantCulture) + " m along the line each"; } };
                 ok.Click += (s, e) =>
                 {
