@@ -76,15 +76,25 @@ namespace BPlus.LiveMap.Core
 
         /// <summary>One section in section coordinates: x = offset + half-width (0 at the left edge of the frame), y = (level - datum) x exaggeration.</summary>
         public static ProfModel Build(IList<SecPt> ground, double halfWidth, double ve, double datum, double textH, bool label, RoadSpec road, string title, out double halfUsed, out string warning)
+        { return Build(ground, halfWidth, ve, datum, textH, label, road, null, title, out halfUsed, out warning); }
+
+        public static ProfModel Build(IList<SecPt> ground, double halfWidth, double ve, double datum, double textH, bool label, RoadSpec road, SecAssembly asm, string title, out double halfUsed, out string warning)
         {
             warning = ""; var g = (ground ?? new List<SecPt>()).OrderBy(p => p.Off).ToList();
-            if (g.Count == 0 && road == null) throw new ArgumentException("nothing to draw");
+            if (g.Count == 0 && road == null && asm == null) throw new ArgumentException("nothing to draw");
             if (ve <= 0) throw new ArgumentException("exaggeration must be above zero");
             double hw = halfWidth; double cl = double.NaN;
             if (road != null)
             {
                 cl = road.CentreLevel; if (double.IsNaN(cl)) { cl = GroundAt(g, road.Centre); if (double.IsNaN(cl)) { cl = g.Count > 0 ? g.Average(p => p.Z) : 0; warning = "no ground at the centre: used " + ProfileMath.F2(cl) + " m"; } }
                 hw = Math.Max(hw, Math.Max(Math.Abs(road.LeftEdge) + road.SwL + road.PlL, Math.Abs(road.RightEdge) + road.SwR + road.PlR) + 1);
+            }
+            AsmGeo ag = null;
+            if (asm != null)
+            {
+                cl = asm.CentreLevel; if (double.IsNaN(cl)) { cl = GroundAt(g, 0); if (double.IsNaN(cl)) { cl = g.Count > 0 ? g.Average(p => p.Z) : 0; warning = "no ground at the centre: used " + ProfileMath.F2(cl) + " m"; } }
+                ag = AssemblyMath.Layout(asm, cl, g); hw = Math.Max(hw, Math.Max(-ag.Left, ag.Right) + 1);
+                if (ag.Notes.Count > 0) warning = (warning == "" ? "" : warning + "; ") + string.Join("; ", ag.Notes);
             }
             halfUsed = hw;
             Func<double, double> X = o => o + hw;
@@ -95,10 +105,11 @@ namespace BPlus.LiveMap.Core
                 double cf = road.Crossfall / 100.0; surf = o => cl - cf * Math.Abs(o - road.Centre);
                 zs.Add(cl); zs.Add(surf(road.LeftEdge) + road.Kerb); zs.Add(surf(road.RightEdge) + road.Kerb); zs.Add(surf(road.LeftEdge)); zs.Add(surf(road.RightEdge));
             }
+            if (ag != null && ag.Segs.Count > 0) { zs.Add(ag.MinZ); zs.Add(ag.MaxZ); }
             double minZ = zs.Min(), maxZ = zs.Max(); if (double.IsNaN(datum)) datum = ProfileMath.AutoDatum(minZ, maxZ);
             var m = new ProfModel { MinZ = minZ, MaxZ = maxZ, Datum = datum, Length = 2 * hw };
             double top = Math.Max(maxZ - datum, 0.1), es = ProfileMath.NiceStep(top / 4.0); m.ElevStep = es;
-            double dimBand = road != null ? 7 * textH : 0;
+            double dimBand = road != null || ag != null ? 7 * textH : 0;
             int nz = (int)Math.Ceiling((top + dimBand / ve) / es - 1e-9); if (nz < 1) nz = 1; double yTop = nz * es * ve;
             double offStep = hw > 30 ? 10 : 5; m.StaStep = offStep;
             m.Segs.Add(new ProfSeg { X1 = 0, Y1 = 0, X2 = 2 * hw, Y2 = 0, Kind = "frame" }); m.Segs.Add(new ProfSeg { X1 = 0, Y1 = 0, X2 = 0, Y2 = yTop, Kind = "frame" });
@@ -139,6 +150,13 @@ namespace BPlus.LiveMap.Core
                 if (road.SwL > 0) m.Texts.Add(new ProfText { X = X(l - road.SwL / 2), Y = yDim, S = road.SwL.ToString("0.###", CultureInfo.InvariantCulture), Align = 1, Kind = "dim" });
                 if (road.SwR > 0) m.Texts.Add(new ProfText { X = X(r + road.SwR / 2), Y = yDim, S = road.SwR.ToString("0.###", CultureInfo.InvariantCulture), Align = 1, Kind = "dim" });
                 m.Texts.Add(new ProfText { X = X((l + r) / 2), Y = yDim + textH * 2.2, S = "road " + (r - l).ToString("0.###", CultureInfo.InvariantCulture) + " m,  centre level " + ProfileMath.F2(cl), Align = 1, Kind = "dim" });
+            }
+            if (ag != null)
+            {
+                foreach (var sg in ag.Segs) m.Segs.Add(new ProfSeg { X1 = X(sg.X1), Y1 = (sg.Y1 - datum) * ve, X2 = X(sg.X2), Y2 = (sg.Y2 - datum) * ve, Kind = sg.Kind });
+                double yD = (maxZ - datum) * ve + textH * 2.0;
+                for (int i = 0; i < ag.Dims.Count; i++) m.Texts.Add(new ProfText { X = X(ag.Dims[i][0]), Y = yD, S = ag.DimText[i], Align = 1, Kind = "dim" });
+                m.Texts.Add(new ProfText { X = X((ag.Left + ag.Right) / 2), Y = yD + textH * 2.2, S = asm.Name + ",  centre level " + ProfileMath.F2(cl), Align = 1, Kind = "dim" });
             }
             return m;
         }

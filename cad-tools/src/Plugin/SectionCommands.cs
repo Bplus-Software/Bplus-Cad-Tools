@@ -58,7 +58,7 @@ namespace BPlus.LiveMap
 
         public sealed class Choice
         {
-            public bool Whole = true, Ground = true; public int Road; /* 0 none, 1 typical, 2 existing */
+            public bool Whole = true, Ground = true; public int Road; /* 0 none, 1 typical, 2 existing, 3 assembly */ public SecAssembly Asm;
             public double Interval = 20, Half = 15, Strip = 2.5, Ve = 1, Start, End, TextH, CentreLevel = double.NaN, SwL, SwR, PlL, PlR, Kerb, Cross; public double[] Lanes = new double[0]; public bool Divide, Labels = true; public int Cols = 3;
         }
 
@@ -73,8 +73,9 @@ namespace BPlus.LiveMap
                 var gr = new CheckBox { Left = 16, Top = 62, Width = 560, Text = havePts ? "Existing ground from the selected points" : "Existing ground from points (no points selected)", Checked = havePts, Enabled = havePts, ForeColor = Theme.Text, BackColor = Color.Transparent };
                 f.Controls.AddRange(new Control[] { rw, r1, gr });
                 f.Controls.Add(Theme.Lbl("Road", 16, 94, 60, true));
-                var ro0 = new RadioButton { Left = 80, Top = 92, Width = 90, Text = "None", ForeColor = Theme.Text, BackColor = Color.Transparent }; var ro1 = new RadioButton { Left = 172, Top = 92, Width = 190, Text = "Typical (presets)", Checked = true, ForeColor = Theme.Text, BackColor = Color.Transparent }; var ro2 = new RadioButton { Left = 364, Top = 92, Width = 220, Text = "Existing road (pick edges)", ForeColor = Theme.Text, BackColor = Color.Transparent };
-                f.Controls.AddRange(new Control[] { ro0, ro1, ro2 });
+                var ro0 = new RadioButton { Left = 70, Top = 92, Width = 70, Text = "None", ForeColor = Theme.Text, BackColor = Color.Transparent }; var ro1 = new RadioButton { Left = 142, Top = 92, Width = 150, Text = "Typical (presets)", Checked = true, ForeColor = Theme.Text, BackColor = Color.Transparent }; var ro3 = new RadioButton { Left = 294, Top = 92, Width = 120, Text = "My assembly", ForeColor = Theme.Text, BackColor = Color.Transparent }; var ro2 = new RadioButton { Left = 416, Top = 92, Width = 180, Text = "Existing (pick edges)", ForeColor = Theme.Text, BackColor = Color.Transparent };
+                f.Controls.AddRange(new Control[] { ro0, ro1, ro3, ro2 });
+                var asmList = AsmUi.All(); var asmBox = new ComboBox { Left = 410, Top = 124, Width = 170, DropDownStyle = ComboBoxStyle.DropDownList, FlatStyle = FlatStyle.Flat }; Theme.Style(asmBox); foreach (var a in asmList) asmBox.Items.Add(a.Name); asmBox.SelectedIndex = 0; f.Controls.Add(Theme.Lbl("SecAssembly", 336, 127, 70)); f.Controls.Add(asmBox);
                 var typ = new ComboBox { Left = 160, Top = 124, Width = 160, DropDownStyle = ComboBoxStyle.DropDownList, FlatStyle = FlatStyle.Flat }; Theme.Style(typ); foreach (var p in pre) typ.Items.Add(p.Name); typ.SelectedIndex = 1;
                 f.Controls.Add(L("Road type", 16, 127, 130)); f.Controls.Add(typ);
                 string[] nm = { "Lane widths (m, left to right, comma)", "Sidewalk left (m)", "Sidewalk right (m)", "Planting left (m)", "Planting right (m)", "Kerb height (m)", "Crossfall (%)", "Centre level (m), empty = ground", "Station interval (m)", "Half-width each side (m)", "Strip along the line (m)", "Vertical exaggeration", "Road width at start (m)", "Road width at end (m)", "Sections per row", "Text height" };
@@ -96,8 +97,9 @@ namespace BPlus.LiveMap
                 var note = Theme.Lbl("Whole road with an existing road: type the road width at the start and the end; it is interpolated along the line, centred on the line. One station: you pick the two edges and the centre.", 16, by + 56, 560, true); note.Height = 40;
                 var info = new Label { Left = 16, Top = by + 98, Width = 560, Height = 36, ForeColor = Color.FromArgb(255, 150, 120), BackColor = Color.Transparent };
                 f.Controls.AddRange(new Control[] { div, lab, note, info });
-                var edit = Theme.Btn("Edit road presets...", 16, 590, 190); var ok = Theme.Btn("Next", 410, 590, 80, true); var cancel = Theme.Btn("Cancel", 498, 590, 80);
+                var edit = Theme.Btn("Edit road presets...", 16, 590, 170); var editA = Theme.Btn("Edit assemblies...", 192, 590, 170); var ok = Theme.Btn("Next", 410, 590, 80, true); var cancel = Theme.Btn("Cancel", 498, 590, 80);
                 edit.Click += (s, e) => { EditPresets(); var np = Presets(); for (int i = 0; i < 3; i++) pre[i] = np[i]; fillFrom(typ.SelectedIndex); };
+                editA.Click += (s, e) => { string keep = asmBox.SelectedItem as string; AsmUi.Edit(keep); asmList = AsmUi.All(); asmBox.Items.Clear(); foreach (var a in asmList) asmBox.Items.Add(a.Name); int ix = asmList.FindIndex(a => a.Name == keep); asmBox.SelectedIndex = ix < 0 ? 0 : ix; };
                 ok.Click += (s, e) =>
                 {
                     double v; var d = new double[16]; var named = new[] { 1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 15 };
@@ -109,11 +111,11 @@ namespace BPlus.LiveMap
                     double ws = 0, we = 0; if (rw.Checked && ro2.Checked) { if (!Theme.TryNum(tb[12].Text, out ws) || !Theme.TryNum(tb[13].Text, out we) || ws <= 0 || we <= 0) { info.Text = "Type the road width at the start and at the end (above 0)."; return; } }
                     if (!gr.Checked && ro0.Checked) { info.Text = "Choose ground from points, a road, or both."; return; }
                     int cols; if (!int.TryParse(tb[14].Text.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out cols) || cols < 1 || cols > 20) { info.Text = "Sections per row: 1 to 20."; return; }
-                    res.Whole = rw.Checked; res.Ground = gr.Checked; res.Road = ro0.Checked ? 0 : ro1.Checked ? 1 : 2; res.Interval = d[8]; res.Half = d[9]; res.Strip = d[10]; res.Ve = d[11]; res.TextH = d[15]; res.SwL = d[1]; res.SwR = d[2]; res.PlL = d[3]; res.PlR = d[4]; res.Kerb = d[5]; res.Cross = d[6];
+                    res.Asm = ro3.Checked && asmBox.SelectedIndex >= 0 ? asmList[asmBox.SelectedIndex].Copy() : null; res.Whole = rw.Checked; res.Ground = gr.Checked; res.Road = ro0.Checked ? 0 : ro1.Checked ? 1 : ro3.Checked ? 3 : 2; res.Interval = d[8]; res.Half = d[9]; res.Strip = d[10]; res.Ve = d[11]; res.TextH = d[15]; res.SwL = d[1]; res.SwR = d[2]; res.PlL = d[3]; res.PlR = d[4]; res.Kerb = d[5]; res.Cross = d[6];
                     res.Lanes = lanes.ToArray(); res.CentreLevel = cl; res.Start = ws; res.End = we; res.Divide = div.Checked; res.Labels = lab.Checked; res.Cols = cols; good = true; f.DialogResult = DialogResult.OK;
                 };
                 cancel.Click += (s, e) => f.DialogResult = DialogResult.Cancel;
-                f.Controls.AddRange(new Control[] { edit, ok, cancel }); f.AcceptButton = ok; f.CancelButton = cancel; AcApp.ShowModalDialog(f);
+                f.Controls.AddRange(new Control[] { edit, editA, ok, cancel }); f.AcceptButton = ok; f.CancelButton = cancel; AcApp.ShowModalDialog(f);
             }
             ch = res; return good;
         }
@@ -121,7 +123,7 @@ namespace BPlus.LiveMap
 
     public partial class Commands
     {
-        static short SecColor(string kind) { switch (kind) { case "frame": return 7; case "grid": return 8; case "centre": return 1; case "road": return 7; case "walk": return 6; case "plant": return 3; case "lane": return 2; case "dim": return 2; case "pt": return 3; default: return 7; } }
+        static short SecColor(string kind) { switch (kind) { case "frame": return 7; case "grid": return 8; case "centre": return 1; case "road": return 7; case "walk": return 6; case "plant": return 3; case "tree": return 3; case "ped": return 30; case "slope": return 4; case "lane": return 2; case "dim": return 2; case "pt": return 3; default: return 7; } }
 
         static int DrawSections(Document doc, List<ProfModel> models, List<double> halfs, Point3d at, double th, int cols)
         {
@@ -220,8 +222,9 @@ namespace BPlus.LiveMap
                             }
                         }
                         if (road != null) { road.SwL = ch.SwL; road.SwR = ch.SwR; road.PlL = ch.PlL; road.PlR = ch.PlR; road.Kerb = ch.Kerb; road.Crossfall = ch.Cross; road.CentreLevel = ch.CentreLevel; }
-                        if (sel.Count < 2 && road == null) { skipped++; notes.Add("station " + ProfileMath.Sta(s) + ": " + sel.Count + " point(s), not drawn"); continue; }
-                        double hu; string warn; var m = SectionMath.Build(sel, ch.Half, ch.Ve, double.NaN, ch.TextH, ch.Labels, road, "Station " + ProfileMath.Sta(s), out hu, out warn);
+                        if (sel.Count < 2 && road == null && !(ch.Road == 3 && ch.Asm != null)) { skipped++; notes.Add("station " + ProfileMath.Sta(s) + ": " + sel.Count + " point(s), not drawn"); continue; }
+                        if (ch.Road == 3 && ch.Asm != null) ch.Asm.CentreLevel = ch.CentreLevel;
+                        double hu; string warn; var m = SectionMath.Build(sel, ch.Half, ch.Ve, double.NaN, ch.TextH, ch.Labels, road, ch.Road == 3 ? ch.Asm : null, "Station " + ProfileMath.Sta(s), out hu, out warn);
                         if (warn != "") notes.Add("station " + ProfileMath.Sta(s) + ": " + warn);
                         models.Add(m); halfs.Add(hu);
                     }

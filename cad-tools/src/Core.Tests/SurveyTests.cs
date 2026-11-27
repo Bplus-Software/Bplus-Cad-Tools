@@ -423,3 +423,49 @@ namespace BPlus.LiveMap.Core.Tests
         }
     }
 }
+namespace BPlus.LiveMap.Core.Tests
+{
+    public class AssemblyTests
+    {
+        [Xunit.Fact]
+        public void PackRoundTripAndDefaults()
+        {
+            var d = AssemblyMath.Defaults(); var back = AssemblyMath.Unpack(AssemblyMath.Pack(d));
+            Xunit.Assert.Equal(d.Count, back.Count); Xunit.Assert.Equal(d[1].Items.Count, back[1].Items.Count); Xunit.Assert.Equal(d[1].Items[3].Type, back[1].Items[3].Type); Xunit.Assert.Equal(3.65, back[1].Items.First(e => e.Type == "Lane").W, 6);
+            foreach (var a in d) foreach (var e in a.Items) Xunit.Assert.Equal("", AssemblyMath.Check(e));
+        }
+        [Xunit.Fact]
+        public void LayoutLevelsAndWidth()
+        {
+            var a = new SecAssembly { Name = "t" }; a.Items.Add(AssemblyMath.Make("Kerb", "L")); a.Items.Add(AssemblyMath.Make("Lane", "L")); a.Items.Add(AssemblyMath.Make("Lane", "R")); a.Items.Add(AssemblyMath.Make("Kerb", "R"));
+            var g = AssemblyMath.Layout(a, 50, null);
+            Xunit.Assert.Equal(-3.65, g.Left, 6); Xunit.Assert.Equal(3.65, g.Right, 6);
+            Xunit.Assert.Equal(50 - 0.02 * 3.5 + 0.15, g.Segs.Where(s => s.Kind == "walk").Max(s => s.Y2), 6);
+            Xunit.Assert.True(g.MinZ < 50 - 0.06);
+        }
+        [Xunit.Fact]
+        public void MedianTreeSlope()
+        {
+            var a = new SecAssembly { Name = "t" }; a.Items.Add(AssemblyMath.Make("Median", "C")); a.Items.Add(AssemblyMath.Make("Lane", "R")); a.Items.Add(AssemblyMath.Make("Tree", "R")); a.Items.Add(AssemblyMath.Make("Slope to ground", "R"));
+            var gr = new System.Collections.Generic.List<SecPt>(); for (int i = 0; i <= 20; i++) gr.Add(new SecPt { Sta = 0, Off = i, Z = 48 });
+            var g = AssemblyMath.Layout(a, 50, gr);
+            Xunit.Assert.Contains(g.Segs, s => s.Kind == "tree"); var sl = g.Segs.Last(s => s.Kind == "slope");
+            Xunit.Assert.Equal(48, sl.Y2, 2); // 1:2 slope reaches the ground
+            Xunit.Assert.True(sl.X2 > sl.X1 + 3.0); Xunit.Assert.Equal(1.5 + 3.5 + 2.0, g.Segs.Where(s => s.Kind == "slope").Min(s => s.X1), 6);
+        }
+        [Xunit.Fact]
+        public void SlopeWithoutGroundAndMirror()
+        {
+            var a = new SecAssembly { Name = "t" }; a.Items.Add(AssemblyMath.Make("Slope to ground", "L")); a.Items.Add(AssemblyMath.Make("Lane", "L"));
+            var g = AssemblyMath.Layout(a, 10, null); Xunit.Assert.Single(g.Notes);
+            AssemblyMath.MirrorLeftToRight(a); Xunit.Assert.Equal(2, a.Items.Count(e => e.Side == "R")); Xunit.Assert.Equal("Slope to ground", a.Items.Last().Type);
+        }
+        [Xunit.Fact]
+        public void SectionBuildsWithAssembly()
+        {
+            var a = AssemblyMath.Defaults()[1]; var gr = new System.Collections.Generic.List<SecPt>(); foreach (var o in new double[] { -30, -10, 0, 10, 30 }) gr.Add(new SecPt { Sta = 0, Off = o, Z = 49.5 });
+            double hu; string w; var m = SectionMath.Build(gr, 15, 1, double.NaN, 0.5, true, null, a, "s", out hu, out w);
+            Xunit.Assert.True(m.Segs.Count > 40); Xunit.Assert.True(hu >= 15);
+        }
+    }
+}

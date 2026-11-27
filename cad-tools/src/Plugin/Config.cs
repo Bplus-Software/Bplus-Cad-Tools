@@ -26,6 +26,7 @@ namespace BPlus.LiveMap
         public static int Decimals { get { int v = F.GetInt("decimals", 3); return v < 0 ? 0 : v > 8 ? 8 : v; } set { F.Set("decimals", value); F.Save(); } }
         public static double TextHeight { get { double v; return double.TryParse(F.Get("textHeight", "1"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out v) && v > 0 && v <= 50 ? v : 1; } set { F.Set("textHeight", value.ToString(System.Globalization.CultureInfo.InvariantCulture)); F.Save(); } }
         public static string ParkingPresets { get { return F.Get("parkingPresets", ""); } set { F.Set("parkingPresets", value ?? ""); F.Save(); } }
+        public static string Assemblies { get { return F.Get("assemblies", ""); } set { F.Set("assemblies", value ?? ""); F.Save(); } }
         public static string RoadPresets { get { return F.Get("roadPresets", ""); } set { F.Set("roadPresets", value ?? ""); F.Save(); } }
         public static bool Enabled { get { return F.GetInt("enabled", 0) == 1; } set { F.Set("enabled", value ? 1 : 0); F.Save(); } }
     }

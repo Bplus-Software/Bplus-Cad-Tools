@@ -138,8 +138,8 @@ namespace BPlus.LiveMap
                 var upd = Theme.Btn("Check for updates now", 16, 258, 180, true); var rel = Theme.Btn("Open releases page", 204, 258, 160); var logb = Theme.Btn("Open log folder", 372, 258, 130);
                 var info = Theme.Lbl("Update: the installer is downloaded, its SHA-256 is checked, and you confirm before it runs.", 16, 296, 490, true); info.Height = 36;
                 var ok = Theme.Btn("Save", 324, 456, 85, true); var cancel = Theme.Btn("Cancel", 417, 456, 85);
-                var park = Theme.Btn("Parking sizes...", 16, 414, 160); park.Click += (s, e) => ParkingUi.EditPresets();
-                var road = Theme.Btn("Road section presets...", 184, 414, 200); road.Click += (s, e) => SectionUi.EditPresets();
+                var park = Theme.Btn("Parking sizes...", 16, 414, 130); park.Click += (s, e) => ParkingUi.EditPresets();
+                var road = Theme.Btn("Road section presets...", 154, 414, 170); var asmB = Theme.Btn("Section assemblies...", 332, 414, 170); asmB.Click += (s, e) => AsmUi.Edit(null); road.Click += (s, e) => SectionUi.EditPresets();
                 var showMap = Theme.Btn("Show / hide live map", 16, 378, 200); var mapOpt = Theme.Btn("Map type and opacity...", 224, 378, 200);
                 showMap.Click += (s, e) => { try { var dd = AcApp.DocumentManager.MdiActiveDocument; f.DialogResult = DialogResult.Cancel; if (dd != null) dd.SendStringToExecute("BPGMAP ", true, false, false); } catch { } };
                 mapOpt.Click += (s, e) => { try { var dd = AcApp.DocumentManager.MdiActiveDocument; f.DialogResult = DialogResult.Cancel; if (dd != null) dd.SendStringToExecute("BPMAPOPT ", true, false, false); } catch { } };
@@ -154,7 +154,7 @@ namespace BPlus.LiveMap
                     Config.AutoUpdate = auto.Checked; Config.PointOrder = (string)ord.SelectedItem; Config.Decimals = (int)dec.Value; Config.TextHeight = h; f.DialogResult = DialogResult.OK;
                 };
                 cancel.Click += (s, e) => f.DialogResult = DialogResult.Cancel;
-                f.Controls.AddRange(new Control[] { auto, ord, dec, th, codes, map, upd, rel, logb, info, showMap, mapOpt, park, road, ok, cancel }); f.CancelButton = cancel;
+                f.Controls.AddRange(new Control[] { auto, ord, dec, th, codes, map, upd, rel, logb, info, showMap, mapOpt, park, road, asmB, ok, cancel }); f.CancelButton = cancel;
                 foreach (Control c in f.Controls) if (c != codes && c != ok && c != cancel && c != showMap && c != mapOpt && c != park && c != road && c.Top > 20) c.Top += 40;
                 f.ShowDialog();
             }
